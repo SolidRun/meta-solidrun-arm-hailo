@@ -1,0 +1,598 @@
+From 0ecbb27c4fc13445210aea068b6c1d6816283f26 Mon Sep 17 00:00:00 2001
+From: Nate Drude <nate.d@variscite.com>
+Date: Wed, 12 Jul 2023 15:48:49 -0500
+Subject: [PATCH 1/3] phy: mxl-8611x: add driver for MaxLinear mxl-8611x PHYs
+
+The MxL86110 is a low power Ethernet PHY transceiver integrated
+circuit following the IEEE 802.3 [1] standard. It offers a
+cost-optimized solution that is well-suited for routers,
+switches, and home gateways. It performs data transmission on
+an Ethernet twisted pair copper cable of category CAT5e or higher.
+The MxL86110 supports 1000, 100, and 10 Mbit/s data rates.
+
+The current driver implementation supports:
+- configuring rgmii from the device tree
+- configuring the LEDs from the device tree
+- reading extended registers using the mdio command, e.g.:
+     => mdio rx ethernet@428a0000 0xa00c
+     Reading from bus ethernet@428a0000
+     PHY at address 0:
+     40972 - 0x2600
+
+Signed-off-by: Nate Drude <nate.d@variscite.com>
+---
+ drivers/net/phy/Kconfig     |   5 +
+ drivers/net/phy/Makefile    |   1 +
+ drivers/net/phy/mxl-8611x.c | 271 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 277 insertions(+)
+ create mode 100644 drivers/net/phy/mxl-8611x.c
+
+diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
+index 68ee7d7a2d..f71ae55a62 100644
+--- a/drivers/net/phy/Kconfig
++++ b/drivers/net/phy/Kconfig
+@@ -202,6 +202,11 @@ endif # PHY_MICREL
+ config PHY_MSCC
+ 	bool "Microsemi Corp Ethernet PHYs support"
+ 
++config PHY_MXL8611X
++	bool "MaxLinear MXL8611X Ethernet PHYs"
++	help
++	  Add support for configuring MaxLinear MXL8611X Ethernet PHYs.
++
+ config PHY_NATSEMI
+ 	bool "National Semiconductor Ethernet PHYs support"
+ 
+diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
+index 218b8c7669..bae94c5959 100644
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -22,6 +22,7 @@ obj-$(CONFIG_PHY_MARVELL) += marvell.o
+ obj-$(CONFIG_PHY_MICREL_KSZ8XXX) += micrel_ksz8xxx.o
+ obj-$(CONFIG_PHY_MICREL_KSZ90X1) += micrel_ksz90x1.o
+ obj-$(CONFIG_PHY_MESON_GXL) += meson-gxl.o
++obj-$(CONFIG_PHY_MXL8611X) += mxl-8611x.o
+ obj-$(CONFIG_PHY_NATSEMI) += natsemi.o
+ obj-$(CONFIG_PHY_NXP_C45_TJA11XX) += nxp-c45-tja11xx.o
+ obj-$(CONFIG_PHY_REALTEK) += realtek.o
+diff --git a/drivers/net/phy/mxl-8611x.c b/drivers/net/phy/mxl-8611x.c
+new file mode 100644
+index 0000000000..467edc5bb5
+--- /dev/null
++++ b/drivers/net/phy/mxl-8611x.c
+@@ -0,0 +1,271 @@
++// SPDX-License-Identifier: GPL-2.0+
++/**
++ *  Driver for MaxLinear MXL861100 Ethernet PHY
++ *
++ * Copyright 2023 Variscite Ltd.
++ * Copyright 2023 MaxLinear Inc.
++ * Author: Nate Drude <nate.d@variscite.com>
++ */
++#include <common.h>
++#include <phy.h>
++#include <linux/bitops.h>
++#include <linux/bitfield.h>
++
++/* PHY IDs */
++#define PHY_ID_MXL86110		0xC1335580
++#define PHY_ID_MXL86111		0xC1335588
++
++/* required to access extended registers */
++#define MXL8611X_EXTD_REG_ADDR_OFFSET				0x1E
++#define MXL8611X_EXTD_REG_ADDR_DATA				0x1F
++
++/* RGMII register */
++#define MXL8611X_EXT_RGMII_CFG1_REG				0xA003
++#define MXL8611X_EXT_RGMII_CFG1_NO_DELAY			0
++
++#define MXL8611X_EXT_RGMII_CFG1_RX_DELAY_MASK			GENMASK(13, 10)
++#define MXL8611X_EXT_RGMII_CFG1_TX_1G_DELAY_MASK		GENMASK(3, 0)
++#define MXL8611X_EXT_RGMII_CFG1_TX_10MB_100MB_DELAY_MASK	GENMASK(7, 4)
++
++/* LED registers and defines */
++#define MXL8611X_LED0_CFG_REG					0xA00C
++#define MXL8611X_LED1_CFG_REG					0xA00D
++#define MXL8611X_LED2_CFG_REG					0xA00E
++
++/**
++ * struct mxl8611x_cfg_reg_map - map a config value to aregister value
++ * @cfg		value in device configuration
++ * @reg		value in the register
++ */
++struct mxl8611x_cfg_reg_map {
++	int cfg;
++	int reg;
++};
++
++static const struct mxl8611x_cfg_reg_map mxl8611x_rgmii_delays[] = {
++	{ 0, 0 },
++	{ 150, 1 },
++	{ 300, 2 },
++	{ 450, 3 },
++	{ 600, 4 },
++	{ 750, 5 },
++	{ 900, 6 },
++	{ 1050, 7 },
++	{ 1200, 8 },
++	{ 1350, 9 },
++	{ 1500, 10 },
++	{ 1650, 11 },
++	{ 1800, 12 },
++	{ 1950, 13 },
++	{ 2100, 14 },
++	{ 2250, 15 },
++	{ 0, 0 } // Marks the end of the array
++};
++
++static int mxl8611x_lookup_reg_value(const struct mxl8611x_cfg_reg_map *tbl,
++				     const int cfg, int *reg)
++{
++	size_t i;
++
++	for (i = 0; i == 0 || tbl[i].cfg; i++) {
++		if (tbl[i].cfg == cfg) {
++			*reg = tbl[i].reg;
++			return 0;
++		}
++	}
++
++	return -EINVAL;
++}
++
++static u16 mxl8611x_ext_read(struct phy_device *phydev, const u32 regnum)
++{
++	u16 val;
++
++	phy_write(phydev, MDIO_DEVAD_NONE, MXL8611X_EXTD_REG_ADDR_OFFSET, regnum);
++	val = phy_read(phydev, MDIO_DEVAD_NONE, MXL8611X_EXTD_REG_ADDR_DATA);
++
++	debug("%s: MXL86110@0x%x 0x%x=0x%x\n", __func__, phydev->addr, regnum, val);
++
++	return val;
++}
++
++static int mxl8611x_ext_write(struct phy_device *phydev, const u32 regnum, const u16 val)
++{
++	debug("%s: MXL86110@0x%x 0x%x=0x%x\n", __func__, phydev->addr, regnum, val);
++
++	phy_write(phydev, MDIO_DEVAD_NONE, MXL8611X_EXTD_REG_ADDR_OFFSET, regnum);
++
++	return phy_write(phydev, MDIO_DEVAD_NONE, MXL8611X_EXTD_REG_ADDR_DATA, val);
++}
++
++static int mxl8611x_extread(struct phy_device *phydev, int addr, int devaddr,
++			       int regnum)
++{
++	return mxl8611x_ext_read(phydev, regnum);
++}
++
++static int mxl8611x_extwrite(struct phy_device *phydev, int addr,
++				int devaddr, int regnum, u16 val)
++{
++	return mxl8611x_ext_write(phydev, regnum, val);
++}
++
++static int mxl8611x_led_cfg(struct phy_device *phydev)
++{
++	int ret = 0;
++	int i;
++	char propname[25];
++	u32 val;
++
++	ofnode node = phy_get_ofnode(phydev);
++
++	if (!ofnode_valid(node)) {
++		printf("%s: failed to get node\n", __func__);
++		return -EINVAL;
++	}
++
++	/* Loop through three the LED registers */
++	for (i = 0; i < 3; i++) {
++		/* Read property from device tree */
++		ret = snprintf(propname, 25, "mxl-8611x,led%d_cfg", i);
++		if (ofnode_read_u32(node, propname, &val))
++			continue;
++
++		/* Update PHY LED register */
++		mxl8611x_ext_write(phydev, MXL8611X_LED0_CFG_REG + i, val);
++	}
++
++	return 0;
++}
++
++static int mxl8611x_rgmii_cfg_of_delay(struct phy_device *phydev, const char *property, int *val)
++{
++	u32 of_val;
++	int ret;
++
++	ofnode node = phy_get_ofnode(phydev);
++
++	if (!ofnode_valid(node)) {
++		printf("%s: failed to get node\n", __func__);
++		return -EINVAL;
++	}
++
++	/* Get property from dts */
++	ret = ofnode_read_u32(node, property, &of_val);
++	if (ret)
++		return ret;
++
++	/* Convert delay in ps to register value */
++	ret = mxl8611x_lookup_reg_value(mxl8611x_rgmii_delays, of_val, val);
++	if (ret)
++		printf("%s: Error: %s = %d is invalid, using default value\n",
++		       __func__, property, of_val);
++
++	return ret;
++}
++
++static int mxl8611x_rgmii_cfg(struct phy_device *phydev)
++{
++	u32 val = 0;
++	int rxdelay, txdelay_100m, txdelay_1g;
++
++	/* Get rgmii register value */
++	val = mxl8611x_ext_read(phydev, MXL8611X_EXT_RGMII_CFG1_REG);
++
++	/* Get RGMII Rx Delay Selection from device tree or rgmii register */
++	if (mxl8611x_rgmii_cfg_of_delay(phydev, "mxl-8611x,rx-internal-delay-ps", &rxdelay))
++		rxdelay = FIELD_GET(MXL8611X_EXT_RGMII_CFG1_RX_DELAY_MASK, val);
++
++	/* Get Fast Ethernet RGMII Tx Clock Delay Selection from device tree or rgmii register */
++	if (mxl8611x_rgmii_cfg_of_delay(phydev, "mxl-8611x,tx-internal-delay-ps-100m",
++					&txdelay_100m))
++		txdelay_100m = FIELD_GET(MXL8611X_EXT_RGMII_CFG1_TX_10MB_100MB_DELAY_MASK, val);
++
++	/* Get Gigabit Ethernet RGMII Tx Clock Delay Selection from device tree or rgmii register */
++	if (mxl8611x_rgmii_cfg_of_delay(phydev, "mxl-8611x,tx-internal-delay-ps-1g", &txdelay_1g))
++		txdelay_1g = FIELD_GET(MXL8611X_EXT_RGMII_CFG1_TX_1G_DELAY_MASK, val);
++
++	switch (phydev->interface) {
++	case PHY_INTERFACE_MODE_RGMII:
++		val = MXL8611X_EXT_RGMII_CFG1_NO_DELAY;
++		break;
++	case PHY_INTERFACE_MODE_RGMII_RXID:
++		val = (val & ~MXL8611X_EXT_RGMII_CFG1_RX_DELAY_MASK) |
++			FIELD_PREP(MXL8611X_EXT_RGMII_CFG1_RX_DELAY_MASK, rxdelay);
++		break;
++	case PHY_INTERFACE_MODE_RGMII_TXID:
++		val = (val & ~MXL8611X_EXT_RGMII_CFG1_TX_10MB_100MB_DELAY_MASK) |
++			FIELD_PREP(MXL8611X_EXT_RGMII_CFG1_TX_10MB_100MB_DELAY_MASK, txdelay_100m);
++		val = (val & ~MXL8611X_EXT_RGMII_CFG1_TX_1G_DELAY_MASK) |
++			FIELD_PREP(MXL8611X_EXT_RGMII_CFG1_TX_1G_DELAY_MASK, txdelay_1g);
++		break;
++	case PHY_INTERFACE_MODE_RGMII_ID:
++		val = (val & ~MXL8611X_EXT_RGMII_CFG1_RX_DELAY_MASK) |
++			FIELD_PREP(MXL8611X_EXT_RGMII_CFG1_RX_DELAY_MASK, rxdelay);
++		val = (val & ~MXL8611X_EXT_RGMII_CFG1_TX_10MB_100MB_DELAY_MASK) |
++			FIELD_PREP(MXL8611X_EXT_RGMII_CFG1_TX_10MB_100MB_DELAY_MASK, txdelay_100m);
++		val = (val & ~MXL8611X_EXT_RGMII_CFG1_TX_1G_DELAY_MASK) |
++			FIELD_PREP(MXL8611X_EXT_RGMII_CFG1_TX_1G_DELAY_MASK, txdelay_1g);
++		break;
++	default:
++		printf("%s: Error: Unsupported rgmii mode %d\n", __func__, phydev->interface);
++		return -EINVAL;
++	}
++
++	return mxl8611x_ext_write(phydev, MXL8611X_EXT_RGMII_CFG1_REG, val);
++}
++
++static int mxl8611x_config(struct phy_device *phydev)
++{
++	int ret;
++
++	/* Configure rgmii */
++	ret = mxl8611x_rgmii_cfg(phydev);
++
++	if (ret < 0)
++		return ret;
++
++	/* Configure LEDs */
++	ret = mxl8611x_led_cfg(phydev);
++
++	if (ret < 0)
++		return ret;
++
++	return genphy_config(phydev);
++}
++
++static int mxl86110_config(struct phy_device *phydev)
++{
++	printf("MXL86110 PHY detected at addr %d\n", phydev->addr);
++	return mxl8611x_config(phydev);
++}
++
++static int mxl86111_config(struct phy_device *phydev)
++{
++	printf("MXL86111 PHY detected at addr %d\n", phydev->addr);
++	return mxl8611x_config(phydev);
++}
++
++U_BOOT_PHY_DRIVER(mxl86110) = {
++	.name = "MXL86110",
++	.uid = PHY_ID_MXL86110,
++	.mask = 0xffffffff,
++	.features = PHY_GBIT_FEATURES,
++	.config = mxl86110_config,
++	.startup = genphy_startup,
++	.shutdown = genphy_shutdown,
++	.readext = mxl8611x_extread,
++	.writeext = mxl8611x_extwrite,
++};
++
++U_BOOT_PHY_DRIVER(mxl86111) = {
++	.name = "MXL86111",
++	.uid = PHY_ID_MXL86111,
++	.mask = 0xffffffff,
++	.features = PHY_GBIT_FEATURES,
++	.config = mxl86111_config,
++	.startup = genphy_startup,
++	.shutdown = genphy_shutdown,
++	.readext = mxl8611x_extread,
++	.writeext = mxl8611x_extwrite,
++};
+-- 
+2.44.0
+
+
+From 8e533d896aeca30248a1e97686300d5a4b30a8a5 Mon Sep 17 00:00:00 2001
+From: Jon Nettleton <jon@solid-run.com>
+Date: Wed, 1 Nov 2023 15:29:33 +0100
+Subject: [PATCH 2/3] Merge with initial patch for backporting
+
+Signed-off-by: Jon Nettleton <jon@solid-run.com>
+---
+ drivers/net/phy/mxl-8611x.c | 19 ++++++++++++++-----
+ drivers/net/phy/phy.c       |  3 +++
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/phy/mxl-8611x.c b/drivers/net/phy/mxl-8611x.c
+index 467edc5bb5..15ee8056c5 100644
+--- a/drivers/net/phy/mxl-8611x.c
++++ b/drivers/net/phy/mxl-8611x.c
+@@ -1,11 +1,14 @@
+ // SPDX-License-Identifier: GPL-2.0+
+ /**
+- *  Driver for MaxLinear MXL861100 Ethernet PHY
++ *  Driver for MaxLinear MXL8611X Ethernet PHYs
+  *
+  * Copyright 2023 Variscite Ltd.
+  * Copyright 2023 MaxLinear Inc.
++ * Copyright 2023 SolidRun Ltd.
+  * Author: Nate Drude <nate.d@variscite.com>
++ * Author: Jon Nettleton <jon@solid-run.com>
+  */
++
+ #include <common.h>
+ #include <phy.h>
+ #include <linux/bitops.h>
+@@ -236,17 +239,15 @@ static int mxl8611x_config(struct phy_device *phydev)
+ 
+ static int mxl86110_config(struct phy_device *phydev)
+ {
+-	printf("MXL86110 PHY detected at addr %d\n", phydev->addr);
+ 	return mxl8611x_config(phydev);
+ }
+ 
+ static int mxl86111_config(struct phy_device *phydev)
+ {
+-	printf("MXL86111 PHY detected at addr %d\n", phydev->addr);
+ 	return mxl8611x_config(phydev);
+ }
+ 
+-U_BOOT_PHY_DRIVER(mxl86110) = {
++static struct phy_driver MXL86110_driver = {
+ 	.name = "MXL86110",
+ 	.uid = PHY_ID_MXL86110,
+ 	.mask = 0xffffffff,
+@@ -258,7 +259,7 @@ U_BOOT_PHY_DRIVER(mxl86110) = {
+ 	.writeext = mxl8611x_extwrite,
+ };
+ 
+-U_BOOT_PHY_DRIVER(mxl86111) = {
++static struct phy_driver MXL86111_driver = {
+ 	.name = "MXL86111",
+ 	.uid = PHY_ID_MXL86111,
+ 	.mask = 0xffffffff,
+@@ -269,3 +270,11 @@ U_BOOT_PHY_DRIVER(mxl86111) = {
+ 	.readext = mxl8611x_extread,
+ 	.writeext = mxl8611x_extwrite,
+ };
++
++int phy_mxl8611x_init(void)
++{
++        phy_register(&MXL86110_driver);
++        phy_register(&MXL86111_driver);
++
++        return 0;
++}
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index c9fc20855b..1d87fb8859 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -526,6 +526,9 @@ int phy_init(void)
+ #ifdef CONFIG_PHY_MESON_GXL
+ 	phy_meson_gxl_init();
+ #endif
++#ifdef CONFIG_PHY_MXL8611X
++	phy_mxl8611x_init();
++#endif
+ #ifdef CONFIG_PHY_NATSEMI
+ 	phy_natsemi_init();
+ #endif
+-- 
+2.44.0
+
+
+From 3a756d69aaf024384958dc7e0a90b6d4d3198778 Mon Sep 17 00:00:00 2001
+From: Jon Nettleton <jon@solid-run.com>
+Date: Wed, 1 Nov 2023 15:30:20 +0100
+Subject: [PATCH 3/3] Fixup for device-tree patch
+
+Signed-off-by: Jon Nettleton <jon@solid-run.com>
+---
+ drivers/net/phy/mxl-8611x.c | 98 ++++++++++++++++++-------------------
+ 1 file changed, 47 insertions(+), 51 deletions(-)
+
+diff --git a/drivers/net/phy/mxl-8611x.c b/drivers/net/phy/mxl-8611x.c
+index 15ee8056c5..19eb56567a 100644
+--- a/drivers/net/phy/mxl-8611x.c
++++ b/drivers/net/phy/mxl-8611x.c
+@@ -11,8 +11,9 @@
+ 
+ #include <common.h>
+ #include <phy.h>
+-#include <linux/bitops.h>
++#include <dm/device_compat.h>
+ #include <linux/bitfield.h>
++#include <linux/bitops.h>
+ 
+ /* PHY IDs */
+ #define PHY_ID_MXL86110		0xC1335580
+@@ -35,49 +36,14 @@
+ #define MXL8611X_LED1_CFG_REG					0xA00D
+ #define MXL8611X_LED2_CFG_REG					0xA00E
+ 
+-/**
+- * struct mxl8611x_cfg_reg_map - map a config value to aregister value
+- * @cfg		value in device configuration
+- * @reg		value in the register
+- */
+-struct mxl8611x_cfg_reg_map {
+-	int cfg;
+-	int reg;
+-};
+-
+-static const struct mxl8611x_cfg_reg_map mxl8611x_rgmii_delays[] = {
+-	{ 0, 0 },
+-	{ 150, 1 },
+-	{ 300, 2 },
+-	{ 450, 3 },
+-	{ 600, 4 },
+-	{ 750, 5 },
+-	{ 900, 6 },
+-	{ 1050, 7 },
+-	{ 1200, 8 },
+-	{ 1350, 9 },
+-	{ 1500, 10 },
+-	{ 1650, 11 },
+-	{ 1800, 12 },
+-	{ 1950, 13 },
+-	{ 2100, 14 },
+-	{ 2250, 15 },
+-	{ 0, 0 } // Marks the end of the array
+-};
+-
+-static int mxl8611x_lookup_reg_value(const struct mxl8611x_cfg_reg_map *tbl,
+-				     const int cfg, int *reg)
++static int mxl8611x_convert_ps_to_reg(int of_value, int *reg)
+ {
+-	size_t i;
++	if (of_value < 0 || of_value > 2250)
++		return -EINVAL;
+ 
+-	for (i = 0; i == 0 || tbl[i].cfg; i++) {
+-		if (tbl[i].cfg == cfg) {
+-			*reg = tbl[i].reg;
+-			return 0;
+-		}
+-	}
++	*reg = DIV_ROUND_CLOSEST(of_value, 150);
+ 
+-	return -EINVAL;
++	return 0;
+ }
+ 
+ static u16 mxl8611x_ext_read(struct phy_device *phydev, const u32 regnum)
+@@ -115,27 +81,42 @@ static int mxl8611x_extwrite(struct phy_device *phydev, int addr,
+ 
+ static int mxl8611x_led_cfg(struct phy_device *phydev)
+ {
+-	int ret = 0;
++	int ret;
+ 	int i;
+ 	char propname[25];
+-	u32 val;
++	u32 of_val;
+ 
+ 	ofnode node = phy_get_ofnode(phydev);
+ 
+ 	if (!ofnode_valid(node)) {
+-		printf("%s: failed to get node\n", __func__);
++		dev_err(phydev->dev, "%s: failed to get node\n", __func__);
++		return -EINVAL;
++	}
++
++	/* Get property from dts */
++	ret = ofnode_read_u32(node, "phy-handle", &of_val);
++	if (ret) {
++		dev_err(phydev->dev, "%s: failed to get phy-handle\n", __func__);
++		return ret;
++	}
++
++	node = ofnode_get_by_phandle(of_val); 
++
++	if (!ofnode_valid(node)) {
++		dev_err(phydev->dev, "%s: failed to get phandle node\n", __func__);
+ 		return -EINVAL;
+ 	}
+ 
+ 	/* Loop through three the LED registers */
+ 	for (i = 0; i < 3; i++) {
+ 		/* Read property from device tree */
+-		ret = snprintf(propname, 25, "mxl-8611x,led%d_cfg", i);
+-		if (ofnode_read_u32(node, propname, &val))
++		ret = snprintf(propname, sizeof(propname), "mxl-8611x,led%d_cfg", i);
++		if (ofnode_read_u32(node, propname, &of_val))
+ 			continue;
+ 
++		printf("setting %s to 0x%x\n", propname, of_val);
+ 		/* Update PHY LED register */
+-		mxl8611x_ext_write(phydev, MXL8611X_LED0_CFG_REG + i, val);
++		mxl8611x_ext_write(phydev, MXL8611X_LED0_CFG_REG + i, of_val);
+ 	}
+ 
+ 	return 0;
+@@ -149,19 +130,34 @@ static int mxl8611x_rgmii_cfg_of_delay(struct phy_device *phydev, const char *pr
+ 	ofnode node = phy_get_ofnode(phydev);
+ 
+ 	if (!ofnode_valid(node)) {
+-		printf("%s: failed to get node\n", __func__);
++		dev_err(phydev->dev, "%s: failed to get node\n", __func__);
++		return -EINVAL;
++	}
++
++	/* Get property from dts */
++	ret = ofnode_read_u32(node, "phy-handle", &of_val);
++	if (ret) {
++		dev_err(phydev->dev, "%s: failed to get phy-handle\n", __func__);
++		return ret;
++	}
++
++	node = ofnode_get_by_phandle(of_val); 
++
++	if (!ofnode_valid(node)) {
++		dev_err(phydev->dev, "%s: failed to get phandle node\n", __func__);
+ 		return -EINVAL;
+ 	}
+ 
+ 	/* Get property from dts */
+ 	ret = ofnode_read_u32(node, property, &of_val);
+-	if (ret)
++	if (ret) {
+ 		return ret;
++	}
+ 
+ 	/* Convert delay in ps to register value */
+-	ret = mxl8611x_lookup_reg_value(mxl8611x_rgmii_delays, of_val, val);
++	ret = mxl8611x_convert_ps_to_reg(of_val, val);
+ 	if (ret)
+-		printf("%s: Error: %s = %d is invalid, using default value\n",
++		dev_err(phydev->dev, "%s: %s = %d is invalid, using default value\n",
+ 		       __func__, property, of_val);
+ 
+ 	return ret;
+-- 
+2.44.0
+

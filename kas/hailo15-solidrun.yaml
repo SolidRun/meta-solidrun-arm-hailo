@@ -1,0 +1,23 @@
+header:
+  version: 11
+  includes:
+    - meta-hailo-soc.yaml
+    - yocto-base.yaml
+
+target:
+  - core-image-minimal
+
+machine: hailo15-solidrun
+distro: poky
+build_system: openembedded
+
+local_conf_header:
+  meta-solidrun-arm-hailo: |
+    require conf/includes/sr_image.conf
+    require conf/includes/hailo_demo.conf
+    MACHINE_FEATURES += "imx334"
+
+repos:
+  meta-solidrun-arm-hailo:
+    url: https://github.com/SolidRun/meta-solidrun-arm-hailo
+    refspec: kirkstone

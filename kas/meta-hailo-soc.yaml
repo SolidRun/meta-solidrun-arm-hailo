@@ -1,0 +1,23 @@
+header:
+  version: 11
+
+repos:
+  meta-hailo-soc:
+    url: https://github.com/hailo-ai/meta-hailo-soc/
+    commit: 860c3728b3d2e8ae09e5b35a012bb64ef7750cdb
+    layers:
+      meta-hailo-bsp-examples: excluded
+      meta-hailo-bsp:
+      meta-hailo-dsp:
+      meta-hailo-imaging:
+      meta-hailo-linux:
+      meta-hailo-media-library:
+
+  meta-hailo:
+    url: "https://github.com/hailo-ai/meta-hailo.git"
+    refspec: kirkstone
+    layers:
+      meta-hailo-libhailort:
+      meta-hailo-vpu:
+      meta-hailo-tappas:
+

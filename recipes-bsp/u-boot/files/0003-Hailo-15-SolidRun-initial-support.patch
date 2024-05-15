@@ -1,0 +1,364 @@
+From 6171a33f01adae42d440624d4b028725652489d4 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Tue, 7 May 2024 14:49:25 +0300
+Subject: [PATCH] Hailo 15 SolidRun initial support
+
+---
+ arch/arm/dts/Makefile                 |   1 +
+ arch/arm/dts/hailo15-solidrun.dts     | 105 ++++++++++++++++++++++++++
+ arch/arm/mach-hailo/Kconfig           |   5 ++
+ board/hailo/common/hailo15_spl.c      |   5 ++
+ board/hailo/hailo15-solidrun/Kconfig  |  12 +++
+ board/hailo/hailo15-solidrun/Makefile |   3 +
+ configs/hailo15_solidrun_defconfig    |  21 ++++++
+ drivers/net/macb.c                    |   2 +-
+ include/configs/hailo15-solidrun.h    |  58 ++++++++++++++
+ 9 files changed, 211 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/dts/hailo15-solidrun.dts
+ create mode 100644 board/hailo/hailo15-solidrun/Kconfig
+ create mode 100644 board/hailo/hailo15-solidrun/Makefile
+ create mode 100644 configs/hailo15_solidrun_defconfig
+ create mode 100644 include/configs/hailo15-solidrun.h
+
+diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
+index 88ffcf107f..4e0fcec5bb 100644
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -1163,6 +1163,7 @@ dtb-$(CONFIG_TARGET_IMX8MM_CL_IOT_GATE_OPTEE) += imx8mm-cl-iot-gate-optee.dtb
+ 
+ dtb-$(CONFIG_TARGET_EA_LPC3250DEVKITV2) += lpc3250-ea3250.dtb
+ 
++dtb-$(CONFIG_TARGET_HAILO15_SOLIDRUN) += hailo15-solidrun.dtb
+ dtb-$(CONFIG_TARGET_HAILO15_GINGER_SOC) += hailo15-ginger-soc.dtb
+ dtb-$(CONFIG_TARGET_HAILO15_GINGER_SOC_SDIO0) += hailo15-ginger-soc-sdio0.dtb
+ dtb-$(CONFIG_TARGET_HAILO15_LAVENDER) += hailo15-lavender.dtb
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+new file mode 100644
+index 0000000000..0dca2f137e
+--- /dev/null
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -0,0 +1,105 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * dts file for Hailo15 SolidRun SOM.
++ * Copyright (c) 2024 SolidRun Ltd.
++ */
++
++#include "hailo15-base.dtsi"
++#include "hailo15_ddr_MT53E1G32D2FW-046_configuration.dtsi"
++#include "hailo15_ddr_MT53E1G32D2FW-046_regconfig_ca_odtb_pd.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Hailo15 SolidRun SOM";
++	compatible = "solidrun,hailo15";
++
++	aliases {
++		eeprom_som = &eeprom_som;
++	};
++};
++
++
++&sdio1 {
++    status = "okay";
++    non-removable;
++    phy-config {
++        card-is-emmc = <0x1>;
++        cmd-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        dat-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        rst-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        clk-pad-values = <0x2 0x2 0x0 0x0>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        sdclkdl-cnfg = <0x1 0x59>; //extdly_en, cckdl_dc
++        drive-strength = <0x9 0x8>; //pad_sp, pad_sn 
++        u-boot,dm-spl;   
++    };
++};
++
++&macb {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_eth>;
++	phy-mode = "rgmii-id";
++    phy-handle = <&phy0>;
++    
++    phy0: ethernet-phy@0 {
++        reg = <0>;
++        mxl-8611x,rx-internal-delay-ps = <1650>;
++        mxl-8611x,tx-internal-delay-ps-100m = <2250>;
++        mxl-8611x,tx-internal-delay-ps-1g = <1200>;
++    };
++};
++
++&pinctrl {
++    pinctrl_eth: eth {
++        pins = "eth_rgmii_tx_clk",
++               "eth_rgmii_tx_ctl",
++               "eth_rgmii_txd_0",
++               "eth_rgmii_txd_1",
++               "eth_rgmii_txd_2",
++               "eth_rgmii_txd_3";
++        drive-strength = <2>;
++    };
++};
++
++&i2c_0 {
++    status = "okay";
++    
++    eeprom_som: m24c02@50 {
++		compatible = "atmel,24c02";
++		reg = <0x50>;
++	};
++
++    pca9539: pca9539@74 {
++		compatible = "nxp,pca9539";
++		reg = <0x74>;
++		gpio-controller;
++		#gpio-cells = <2>;
++        gpio-line-names =
++        "pca_0_WL_REG_ON",
++        "pca_1_BT_REG_ON",
++        "pca_2_ETH_RST",
++        "pca_3_ENET_nINT",
++        "pca_4",
++        "pca_8_H_PCIE_PERST_N",
++        "pca_9_H_PCIE_CLKREQ_N",
++        "pca_10_H_PCIE_WAKE_N",
++        "pca_11_PCIE_nCLK_N",
++        "pca_12",
++        "pca_13",
++        "pca_14",
++        "pca_15";
++
++        WIFI_HOG {
++			gpio-hog;
++			gpios = <0 GPIO_ACTIVE_HIGH>;
++			output-low;
++			line-name = "WL_REG_ON";
++		};
++        BT_HOG {
++			gpio-hog;
++			gpios = <1 GPIO_ACTIVE_HIGH>;
++			output-low;
++			line-name = "WL_REG_ON";
++		};
++    };
++};
+\ No newline at end of file
+diff --git a/arch/arm/mach-hailo/Kconfig b/arch/arm/mach-hailo/Kconfig
+index 6c79db1216..1e348ffc25 100644
+--- a/arch/arm/mach-hailo/Kconfig
++++ b/arch/arm/mach-hailo/Kconfig
+@@ -253,6 +253,10 @@ config SPL_LOAD_FIT_ADDRESS
+ 
+ endif
+ 
++config TARGET_HAILO15_SOLIDRUN
++	bool "Hailo15 SBC"
++	select MACH_HAILO15
++
+ config TARGET_HAILO15_VP
+ 	bool "Hailo15 VP"
+ 	select MACH_HAILO15
+@@ -303,6 +307,7 @@ config TARGET_HAILO10_M2
+ 	bool "Hailo10 M.2"
+ 	select MACH_HAILO10
+ 
++source "board/hailo/hailo15-solidrun/Kconfig"
+ source "board/hailo/hailo15-vp/Kconfig"
+ source "board/hailo/hailo15-ginger-soc/Kconfig"
+ source "board/hailo/hailo15-ginger-soc-sdio0/Kconfig"
+diff --git a/board/hailo/common/hailo15_spl.c b/board/hailo/common/hailo15_spl.c
+index 5cbf5fa0eb..42701fcabe 100644
+--- a/board/hailo/common/hailo15_spl.c
++++ b/board/hailo/common/hailo15_spl.c
+@@ -41,6 +41,11 @@ void board_boot_order(u32 *spl_boot_list)
+ #endif /* CONFIG_TARGET_HAILO15L_OREGANO */
+ 	} else if (!strcmp(s, "mmc2")) {
+ 		spl_boot_list[0] = BOOT_DEVICE_MMC2;
++#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
++		/* Fallback to the uart if eMMC is empty */
++		spl_boot_list[1] = BOOT_DEVICE_UART;
++#endif
++
+ 	} else if (!strcmp(s, "mmc12")) {
+ 		spl_boot_list[0] = BOOT_DEVICE_MMC1;
+ 		spl_boot_list[1] = BOOT_DEVICE_MMC2;
+diff --git a/board/hailo/hailo15-solidrun/Kconfig b/board/hailo/hailo15-solidrun/Kconfig
+new file mode 100644
+index 0000000000..c886e471b6
+--- /dev/null
++++ b/board/hailo/hailo15-solidrun/Kconfig
+@@ -0,0 +1,12 @@
++if TARGET_HAILO15_SOLIDRUN
++
++config SYS_BOARD
++	default "hailo15-solidrun"
++
++config SYS_VENDOR
++	default "hailo"
++
++config SYS_CONFIG_NAME
++	default "hailo15-solidrun"
++
++endif
+diff --git a/board/hailo/hailo15-solidrun/Makefile b/board/hailo/hailo15-solidrun/Makefile
+new file mode 100644
+index 0000000000..4cf1706f85
+--- /dev/null
++++ b/board/hailo/hailo15-solidrun/Makefile
+@@ -0,0 +1,3 @@
++# SPDX-License-Identifier: GPL-2.0
++
++obj- += dummy.o
+\ No newline at end of file
+diff --git a/configs/hailo15_solidrun_defconfig b/configs/hailo15_solidrun_defconfig
+new file mode 100644
+index 0000000000..7b7bc162ef
+--- /dev/null
++++ b/configs/hailo15_solidrun_defconfig
+@@ -0,0 +1,23 @@
++CONFIG_ARM=y
++CONFIG_ARCH_HAILO=y
++CONFIG_TARGET_HAILO15_SOLIDRUN=y
++CONFIG_DEFAULT_DEVICE_TREE="hailo15-solidrun"
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_DW=y
++CONFIG_CMD_I2C=y
++CONFIG_SPI_FLASH_ISSI=y
++CONFIG_DM_ETH_PHY=y
++CONFIG_DM_MDIO=y
++CONFIG_CMD_FS_GENERIC=y
++CONFIG_PHY_MXL8611X=y
++CONFIG_CMD_GPIO=y
++CONFIG_GPIO_HOG=y
++CONFIG_DM_GPIO_LOOKUP_LABEL=y
++CONFIG_DM_PCA953X=y
++
++CONFIG_MISC=y
++CONFIG_I2C_EEPROM=y
++CONFIG_CMD_EEPROM=y
++CONFIG_CMD_TLV_EEPROM=y
++CONFIG_EEPROM_TLV_LIB=y
++CONFIG_MAC_ADDR_IN_SPIFLASH=y
+diff --git a/drivers/net/macb.c b/drivers/net/macb.c
+index 17b266bd01..9416f07b75 100644
+--- a/drivers/net/macb.c
++++ b/drivers/net/macb.c
+@@ -64,7 +64,7 @@ DECLARE_GLOBAL_DATA_PTR;
+ #define MACB_TX_RING_SIZE		16
+ 
+ #define MACB_TX_TIMEOUT		1000
+-#define MACB_AUTONEG_TIMEOUT	5000000
++#define MACB_AUTONEG_TIMEOUT	15000000
+ 
+ #ifdef CONFIG_MACB_ZYNQ
+ /* INCR4 AHB bursts */
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+new file mode 100644
+index 0000000000..b43cfc0148
+--- /dev/null
++++ b/include/configs/hailo15-solidrun.h
+@@ -0,0 +1,58 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2019-2023 Hailo Technologies Ltd. All rights reserved.  
++ *
++ * Configuration for Hailo15.
++ */
++
++#ifndef __HAILO15_SOLIDRUN_H
++#define __HAILO15_SOLIDRUN_H
++
++#define SWUPDATE_MMC_INDEX "1"
++
++#define BOOTMENU \
++    /* Try all boot options by order */ \
++    "bootmenu_0=Autodetect=" \
++        "if test \"${auto_uboot_update_enable}\" = \"yes\"; then run auto_uboot_update; exit 1; fi; " \
++        "echo Trying Boot from eMMC; run boot_mmc1;" \
++        "echo Trying Boot from NFS; run bootnfs;" \
++        "echo ERROR: All boot options failed\0" \
++    "bootmenu_1=Boot from eMMC=run boot_mmc1\0" \
++    "bootmenu_2=Update eMMC (wic) from TFTP=run update_wic_mmc1 && bootmenu -1\0" \
++    "bootmenu_3=Update eMMC (partitions) from TFTP=run update_partitions_mmc1 && bootmenu -1\0" \
++    "bootmenu_4=Boot from NFS=run bootnfs\0" \
++    "default_spl_boot_source=mmc2\0" \
++    "spl_boot_source=mmc2\0"
++
++#include "hailo15_common.h"
++
++/*! @note: lpddr4 inline ecc located at the top 1/8 of the referred CS.
++ *         In regards of using LPDDR4 setup of:
++ *           - 2 ranks (Also refered as CS)
++ *           - 2 channels per rank
++ *           - Each channel is 16 bits wide => each rank is 32 bits bide
++ *           - Rank size: 2G bytes
++ *         If __not__ using ECC, then memory access are located in a single region:
++ *           - 0x80000000 -  0x17fffffff: Bank #0 (4G = 0x100000000)
++ *         If using ECC, then memory region is spilted to 2 ranges:
++ *           - 0x080000000 - 0x0efffffff: Bank #0     (1.75G = 0x70000000)
++ *           - 0x0f0000000 - 0x0ffffffff: Bank #0 ECC (0.25G = 0x10000000)
++ *           - 0x100000000 - 0x16fffffff: Bank #1     (1.75G = 0x70000000)
++ *           - 0x170000000 - 0x17fffffff: Bank #1 ECC (0.25G = 0x10000000)
++ */
++#ifdef CONFIG_HAILO15_DDR_ENABLE_ECC
++
++/* Bank 0 size using ECC */
++#define PHYS_SDRAM_1_SIZE (0x70000000)
++/* Bank 1 address/size using ECC */
++#define PHYS_SDRAM_2 (0x100000000)
++#define PHYS_SDRAM_2_SIZE (0x70000000)
++
++#else
++
++/* Bank 0 size not using ECC */
++#define PHYS_SDRAM_1_SIZE (0x100000000)
++
++#endif
++
++#endif /* __HAILO15_SOLIDRUN_H */
+\ No newline at end of file
+-- 
+2.45.0
+
+From feceb92f9ff2e5aa9d21b5af0fd6d531ed0f5183 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Wed, 8 May 2024 15:07:41 +0300
+Subject: [PATCH] Read macs from tlv on boot
+
+---
+ board/hailo/hailo15-solidrun/Makefile           |  2 +-
+ board/hailo/hailo15-solidrun/hailo15_solidrun.c | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+ create mode 100644 board/hailo/hailo15-solidrun/hailo15_solidrun.c
+
+diff --git a/board/hailo/hailo15-solidrun/Makefile b/board/hailo/hailo15-solidrun/Makefile
+index 4cf1706f85..a4a927ab73 100644
+--- a/board/hailo/hailo15-solidrun/Makefile
++++ b/board/hailo/hailo15-solidrun/Makefile
+@@ -1,3 +1,3 @@
+ # SPDX-License-Identifier: GPL-2.0
+ 
+-obj- += dummy.o
+\ No newline at end of file
++obj-$(CONFIG_TARGET_HAILO15_SOLIDRUN) += hailo15_solidrun.o
+\ No newline at end of file
+diff --git a/board/hailo/hailo15-solidrun/hailo15_solidrun.c b/board/hailo/hailo15-solidrun/hailo15_solidrun.c
+new file mode 100644
+index 0000000000..318226cba4
+--- /dev/null
++++ b/board/hailo/hailo15-solidrun/hailo15_solidrun.c
+@@ -0,0 +1,10 @@
++#include <common.h>
++
++void set_mac_addr(void)
++{
++    int ret = mac_read_from_eeprom();
++    if (ret)
++    {
++        puts("Failed to read MAC from TLV\n");
++    }
++}
+-- 
+2.45.0
+
