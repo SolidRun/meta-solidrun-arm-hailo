@@ -1,0 +1,90 @@
+From 4265aad82d19cfe8561f5d3d0e36272d393dfc78 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Thu, 30 May 2024 15:06:57 +0300
+Subject: [PATCH] Enable wifi and bt
+
+---
+ arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi | 56 +++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+index cb3b29c9d39c..b7defd22f09e 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+@@ -24,6 +24,17 @@ sensor_clk: sensor_clk {
+         #clock-cells = <0>;
+         clock-frequency = <24000000>;
+     };
++
++
++    wl_reg_on: voltage-regulator-0 {
++		compatible = "regulator-fixed";
++		regulator-name = "wl_reg_on";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio_pca 0 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++        regulator-always-on;
++	};
+ };
+ 
+ &csi2rx0 {
+@@ -208,6 +219,11 @@ pinctrl_i2c2: i2c2 {
+         function = "i2c2";
+         groups = "i2c2_1_grp";
+     };
++
++    pinctrl_uart0_cts_rts: uart0_cts_rts {
++        function = "uart0_cts_rts";
++        groups = "uart0_cts_rts_1_grp";
++    };
+ };
+ 
+ &gpio0 {
+@@ -260,3 +276,43 @@ &gpio1 {
+         "uart0_cts_pad_in",
+         "uart0_rts_pad_out";
+ };
++
++
++&sdio0 {
++    status = "okay";
++    vqmmc-supply = <&wl_reg_on>;
++
++    phy-config {
++		card-is-emmc = <0x1>;
++        cmd-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        dat-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        rst-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        clk-pad-values = <0x2 0x2 0x0 0x0>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        sdclkdl-cnfg = <0x0 0x32>; //extdly_en, cckdl_dc
++        drive-strength = <0xC 0xC>; //pad_sp, pad_sn
++    };
++
++	brcmf: wifi@1 {
++		status = "okay";
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++	};
++};
++
++&sdio0_reserved {
++    status = "okay";
++};
++
++
++&serial0 {
++	pinctrl-0 = <&pinctrl_uart0_cts_rts>;
++	pinctrl-names = "default";
++	// uart-has-rtscts;
++	status = "okay";
++    max-speed = <115200>;
++
++	bluetooth {
++		compatible = "brcm,bcm4330-bt";
++		shutdown-gpios = <&gpio_pca 1 GPIO_ACTIVE_HIGH>;
++	};
++};
+-- 
+2.45.1
+

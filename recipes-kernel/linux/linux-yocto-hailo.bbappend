@@ -9,3 +9,9 @@ SRC_URI:append = " \
 SRC_URI:append = " \
     file://solidrun-H15-SOM.cfg \
 "
+
+#WIFI/BT
+
+SRC_URI:append = " \
+    file://0001-Enable-wifi-and-bt.patch \
+"
