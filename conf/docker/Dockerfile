@@ -1,4 +1,3 @@
-# Use Ubuntu 22.04 LTS (Jammy Jellyfish) as the base image
 FROM ubuntu:20.04
 
 # Set the default shell to bash
@@ -22,12 +21,11 @@ RUN apt-get update && apt-get install -y apt-transport-https \
     python3-jinja2 libegl1-mesa libsdl1.2-dev \
     python3-subunit mesa-common-dev patchelf \
     zstd liblz4-tool file locales libacl1 \
-    icecc tree sudo locales ca-certificates \
-    bash 
+    tree sudo locales ca-certificates \
+    bash icecc
 
 RUN locale-gen en_US.UTF-8
 
-RUN apt-get install -y 
 RUN update-ca-certificates
 
 # KAS 
@@ -56,6 +54,7 @@ RUN chown -R developer:developer /home/developer/.ssh
 
 RUN git config --add --system user.email "developer@example.com"
 RUN git config --add --system user.name "Build Container"
+RUN git config --add --system http.version HTTP/1.1
 
 # The entry point is set to bash. This means that when the container starts, it will drop the user into bash
 ENTRYPOINT ["/bin/bash"]
