@@ -20,4 +20,4 @@ local_conf_header:
 repos:
   meta-solidrun-arm-hailo:
     url: https://github.com/SolidRun/meta-solidrun-arm-hailo
-    refspec: kirkstone
+    branch: kirkstone
