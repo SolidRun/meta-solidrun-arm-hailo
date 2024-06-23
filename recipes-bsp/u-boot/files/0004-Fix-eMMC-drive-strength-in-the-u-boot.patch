@@ -1,0 +1,27 @@
+From 421cfebfc53dde5e072385e5190a752245f2a5f4 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 23 Jun 2024 16:28:54 +0300
+Subject: [PATCH] Fix eMMC drive strength in the u-boot
+
+---
+ arch/arm/dts/hailo15-solidrun.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+index e9322f5254..d9018ce5bd 100644
+--- a/arch/arm/dts/hailo15-solidrun.dts
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -28,8 +28,8 @@
+         dat-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
+         rst-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
+         clk-pad-values = <0x2 0x2 0x0 0x0>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
+-        sdclkdl-cnfg = <0x1 0x59>; //extdly_en, cckdl_dc
+-        drive-strength = <0x9 0x8>; //pad_sp, pad_sn 
++        sdclkdl-cnfg = <0x0 0x32>; //extdly_en, cckdl_dc
++        drive-strength = <0xC 0xC>; //pad_sp, pad_sn
+         u-boot,dm-spl;   
+     };
+ };
+-- 
+2.45.1
+
