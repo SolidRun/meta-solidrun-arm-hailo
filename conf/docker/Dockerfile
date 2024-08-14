@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y apt-transport-https \
     python3-subunit mesa-common-dev patchelf \
     zstd liblz4-tool file locales libacl1 \
     tree sudo locales ca-certificates \
-    bash icecc
+    bash icecc tmux
 
 RUN locale-gen en_US.UTF-8
 
@@ -32,9 +32,9 @@ RUN update-ca-certificates
 RUN python3 -m pip install kas
 
 # Set environment variables
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
 
 # Arguments to pass host user's UID and GID
 ARG USER_ID=1000

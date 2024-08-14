@@ -111,6 +111,7 @@ jobs:
             export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS CACHE_DIR"
             echo "require conf/includes/ci.conf" >> conf/local.conf
             cat conf/local.conf
+            bitbake core-image-minimal --runall=fetch
             bitbake core-image-minimal
     
       - name: Update cache on the server  
@@ -139,6 +140,8 @@ jobs:
             cp $BUILD_PATH/fitImage deploy/
             cp $BUILD_PATH/hailo15_scu_bl.bin deploy/
             cp $BUILD_PATH/hailo15_scu_fw.bin deploy/
+            cp $BUILD_PATH/scu_bl_cfg_a.bin deploy/
+            cp $BUILD_PATH/scu_bl_cfg_b.bin deploy/
             cp $BUILD_PATH/u-boot.dtb.signed deploy/
             cp $BUILD_PATH/u-boot-initial-env deploy/
             cp $BUILD_PATH/u-boot-spl.bin deploy/
@@ -178,7 +181,7 @@ jobs:
         run: |
             mkdir -p s3
             tar cJf s3/solidrun-hailo15_${{ needs.build_images.outputs.build_tag }}.tar.xz \
-              deploy/* 
+              -C deploy/ .
 
       - name: Upload to S3
         uses: shallwefootball/upload-s3-action@v1.3.3
