@@ -15,7 +15,6 @@ local_conf_header:
   meta-solidrun-arm-hailo: |
     require conf/includes/sr_image.conf
     require conf/includes/hailo_demo.conf
-    MACHINE_FEATURES += "imx334"
 
 repos:
   meta-solidrun-arm-hailo:
