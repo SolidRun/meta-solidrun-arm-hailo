@@ -1,0 +1,38 @@
+From fff9f828b6c6ace62b398b17f9411f06ee860711 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Tue, 20 Aug 2024 11:29:57 +0300
+Subject: [PATCH 1/4] [panel-ronbo] Use gpiod_set_value_cansleep
+
+---
+ drivers/gpu/drm/panel/panel-ronbo-rb070d30.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c b/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
+index 1fb579a574d9..28088ce1ed64 100644
+--- a/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
++++ b/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
+@@ -54,9 +54,9 @@ static int rb070d30_panel_prepare(struct drm_panel *panel)
+ 	}
+ 
+ 	msleep(20);
+-	gpiod_set_value(ctx->gpios.power, 1);
++	gpiod_set_value_cansleep(ctx->gpios.power, 1);
+ 	msleep(20);
+-	gpiod_set_value(ctx->gpios.reset, 1);
++	gpiod_set_value_cansleep(ctx->gpios.reset, 1);
+ 	msleep(20);
+ 	return 0;
+ }
+@@ -65,8 +65,8 @@ static int rb070d30_panel_unprepare(struct drm_panel *panel)
+ {
+ 	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
+ 
+-	gpiod_set_value(ctx->gpios.reset, 0);
+-	gpiod_set_value(ctx->gpios.power, 0);
++	gpiod_set_value_cansleep(ctx->gpios.reset, 0);
++	gpiod_set_value_cansleep(ctx->gpios.power, 0);
+ 	regulator_disable(ctx->supply);
+ 
+ 	return 0;
+-- 
+2.46.0
