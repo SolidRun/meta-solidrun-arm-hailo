@@ -111,6 +111,7 @@ jobs:
             export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS CACHE_DIR"
             echo "require conf/includes/ci.conf" >> conf/local.conf
             cat conf/local.conf
+            bitbake -c cleanall scu-bl scu-fw u-boot u-boot-tfa-image trusted-firmware-a-hailo
             bitbake core-image-minimal --runall=fetch
             bitbake core-image-minimal
     
