@@ -104,31 +104,45 @@ jobs:
       - name: Build
         shell: bash
         run: |
-            iceccd --no-remote -s ciserver.ci -d
             WORKDIR=$(pwd)
             source poky/oe-init-build-env
+            export CI_MIRROR="http://cicache.ci:8000/cimirror/${{ github.repository }}/downloads"
             export CACHE_DIR="$WORKDIR/buildcache"
-            export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS CACHE_DIR"
+            export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS CACHE_DIR CI_MIRROR"
             echo "require conf/includes/ci.conf" >> conf/local.conf
             cat conf/local.conf
             bitbake -c cleanall scu-bl scu-fw u-boot u-boot-tfa-image trusted-firmware-a-hailo
             bitbake core-image-minimal --runall=fetch
-            bitbake core-image-minimal
+            # bitbake core-image-minimal
     
-      - name: Update cache on the server  
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        uses: tespkg/actions-cache/save@v1
+      # - name: Update cache on the server  
+      #   # if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      #   uses: tespkg/actions-cache/save@v1
+      #   with:
+      #     endpoint: ciserver.ci
+      #     port: 9000
+      #     insecure: true
+      #     accessKey: ${{ secrets.CI_CACHE_MINIO_ACCESS }}
+      #     secretKey: ${{ secrets.CI_CACHE_MINIO_SECRET }}
+      #     bucket: cicache
+      #     use-fallback: false
+      #     key: ${{ github.repository }}
+      #     path: |
+      #       buildcache/sstate-cache
+      #       buildcache/ccache
+      #       buildcache/downloads
+
+      - name: Update download mirrors  
+        # if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: keithweaver/aws-s3-github-action@v1.0.0
         with:
-          endpoint: ciserver.ci
-          port: 9000
-          insecure: true
-          accessKey: ${{ secrets.CI_CACHE_MINIO_ACCESS }}
-          secretKey: ${{ secrets.CI_CACHE_MINIO_SECRET }}
-          bucket: cicache
-          use-fallback: false
-          key: ${{ github.repository }}
-          path: |
-            buildcache
+          command: sync
+          source: buildcache/downloads
+          destination: s3://cimirror/${{ github.repository }}
+          aws_access_key_id: ${{ secrets.CI_CACHE_MINIO_ACCESS }}
+          aws_secret_access_key: ${{ secrets.CI_CACHE_MINIO_SECRET }}
+          aws_region: us-east-1
+          flags: "--endpoint-url http://ciserver.ci:9000"
 
       - name: Copy deploy artifacts
         shell: bash
