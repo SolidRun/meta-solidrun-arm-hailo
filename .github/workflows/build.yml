@@ -101,6 +101,11 @@ jobs:
           path: |
             buildcache
 
+      - name: Build board tools
+        shell: bash
+        run: |
+            python3 -m pip wheel meta-hailo-soc/meta-hailo-bsp/hailo15_board_tools
+
       - name: Build
         shell: bash
         run: |
@@ -135,10 +140,11 @@ jobs:
         run: |
             mkdir deploy
             BUILD_PATH=build/tmp/deploy/images/hailo15-solidrun
-            cp $BUILD_PATH/core-image-minimal-hailo15-solidrun.wic deploy/
+            cp $BUILD_PATH/core-image-minimal-hailo15-solidrun.wic.zst deploy/
             cp $BUILD_PATH/core-image-minimal-hailo15-solidrun.wic.bmap deploy/
             cp $BUILD_PATH/customer_certificate.bin deploy/
             cp $BUILD_PATH/fitImage deploy/
+            cp $BUILD_PATH/fitImage-core-image-flashing-ramdisk-hailo15-solidrun-hailo15-solidrun deploy/
             cp $BUILD_PATH/hailo15_scu_bl.bin deploy/
             cp $BUILD_PATH/hailo15_scu_fw.bin deploy/
             cp $BUILD_PATH/scu_bl_cfg_a.bin deploy/
@@ -148,6 +154,7 @@ jobs:
             cp $BUILD_PATH/u-boot-spl.bin deploy/
             cp $BUILD_PATH/u-boot-tfa.itb deploy/
             cp $BUILD_PATH/hailo15_uart_recovery_fw.bin deploy/
+            cp hailo15_board_tools*.whl deploy/
 
       - name: Deploy to the local minio storage
         uses: yakubique/minio-upload@v1.1.3
