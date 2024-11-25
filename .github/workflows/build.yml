@@ -148,7 +148,6 @@ jobs:
             cp $BUILD_PATH/hailo15_scu_bl.bin deploy/
             cp $BUILD_PATH/hailo15_scu_fw.bin deploy/
             cp $BUILD_PATH/scu_bl_cfg_a.bin deploy/
-            cp $BUILD_PATH/scu_bl_cfg_b.bin deploy/
             cp $BUILD_PATH/u-boot.dtb.signed deploy/
             cp $BUILD_PATH/u-boot-initial-env deploy/
             cp $BUILD_PATH/u-boot-spl.bin deploy/
