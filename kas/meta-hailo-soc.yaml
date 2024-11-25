@@ -4,7 +4,7 @@ header:
 repos:
   meta-hailo-soc:
     url: https://github.com/hailo-ai/meta-hailo-soc/
-    commit: a3784cced763ea7e17f05acfb9912682e570a327
+    commit: 658be45b11e753f0a969ebd29a49eb6e47743e26
     layers:
       meta-hailo-bsp-examples: excluded
       meta-hailo-bsp:
@@ -15,7 +15,7 @@ repos:
 
   meta-hailo:
     url: "https://github.com/hailo-ai/meta-hailo.git"
-    commit: 5d52200a54ede32230e5edc68d42ac402beeabb4
+    branch: kirkstone-vpu
     layers:
       meta-hailo-libhailort:
       meta-hailo-vpu:
