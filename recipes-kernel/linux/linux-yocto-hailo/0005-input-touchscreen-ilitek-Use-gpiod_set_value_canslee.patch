@@ -1,0 +1,31 @@
+From 11e5216146e8cf21c8d1bdb1a1532637b15784a0 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 25 Nov 2024 10:15:51 +0200
+Subject: [PATCH 1/4] input: touchscreen: ilitek: Use gpiod_set_value_cansleep
+ for reset GPIO
+
+Replace gpiod_set_value with gpiod_set_value_cansleep in the ilitek_reset
+function to ensure proper handling of GPIOs that may sleep (I2C expanders, etc).
+---
+ drivers/input/touchscreen/ilitek_ts_i2c.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/input/touchscreen/ilitek_ts_i2c.c b/drivers/input/touchscreen/ilitek_ts_i2c.c
+index c5d259c76adc..f731215f0901 100644
+--- a/drivers/input/touchscreen/ilitek_ts_i2c.c
++++ b/drivers/input/touchscreen/ilitek_ts_i2c.c
+@@ -391,9 +391,9 @@ static const struct ilitek_protocol_map ptl_func_map[] = {
+ static void ilitek_reset(struct ilitek_ts_data *ts, int delay)
+ {
+ 	if (ts->reset_gpio) {
+-		gpiod_set_value(ts->reset_gpio, 1);
++		gpiod_set_value_cansleep(ts->reset_gpio, 1);
+ 		mdelay(10);
+-		gpiod_set_value(ts->reset_gpio, 0);
++		gpiod_set_value_cansleep(ts->reset_gpio, 0);
+ 		mdelay(delay);
+ 	}
+ }
+-- 
+2.47.0
+
