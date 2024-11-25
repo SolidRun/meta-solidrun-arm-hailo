@@ -1226,3 +1226,322 @@ index b90de6697453..e6d9bbcfa9e2 100644
 -- 
 2.46.0
 
+From 40f5b3b71f91e8d4928bfcb321b2f94f4dc62ca5 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 25 Nov 2024 10:20:03 +0200
+Subject: [PATCH 2/4] Port to hailo bsp v1.5.0
+
+---
+ arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+index 209d3c63e584..66e33f88102e 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+@@ -184,11 +184,7 @@ pinctrl_uart0_cts_rts: uart0_cts_rts {
+     pinctrl_usb_overcurrent_n_in: pinctrl_usb_overcurrent_n_in {
+         function = "usb_overcurrent_in";
+         groups = "usb_overcurrent_in_grp";
+-    };
+-
+-    pinctrl_usb_drive_vbus_out: pinctrl_usb_drive_vbus_out {
+-        function = "usb_drive_vbus_out";
+-        groups = "usb_drive_vbus_out_2_grp";
++        status = "disabled";
+     };
+ 
+     pinctrl_uart2: serial2 {
+@@ -343,9 +339,14 @@ &sdio0_reserved {
+     status = "okay";
+ };
+ 
+-
+-&torrent_phy {
++&hailo_torrent_phy {
+     status = "okay";
++    usb-lane = <3>;
++    usb-lane-pma-pll-full-rate-divider = <PCI_PMA_PLL_FULL_RATE_CLK_DIVIDER_4>;
++    lanes-config = <PCI_PHY_LINK_LANES_CFG__2x1_PLUS_1x2__MASTER_LANES_LN0_LN2_LN3>;
++};
++
++&cdns_torrent_phy {
+     torrent_phy_pcie: phy@0 {
+         reg = <0>;
+         resets = <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_0>, <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_1>;
+@@ -363,10 +364,11 @@ torrent_phy_usb3: phy@3 {
+     };
+ };
+ 
+-&usb3 {
++&cdns_usb3 {
+     dr_mode = "host";
+     phys = <&torrent_phy_usb3>;
+     phy-names = "cdns3,usb3-phy";
++    disconnected-overcurrent;
+     pinctrl-names = "default";
+     // pinctrl-0 = <&pinctrl_usb_overcurrent_n_in>, <&pinctrl_usb_drive_vbus_out>;
+     pinctrl-0 = <&pinctrl_usb_overcurrent_n_in>;
+-- 
+2.47.0
+
+From 55f0f47f9736231fb6a37d2a4b8e0e006042e8a9 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 25 Nov 2024 10:20:29 +0200
+Subject: [PATCH 3/4] SR H15 SOM: enable bluetooth support
+
+---
+ arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+index 66e33f88102e..b8c8ca30b4b8 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+@@ -294,11 +294,11 @@ &serial0 {
+     uart-has-rtscts;
+     status = "okay";
+ 
+-    // bluetooth {
+-    //     max-speed = <115200>;
+-    //     compatible = "brcm,bcm4330-bt";
+-    //     shutdown-gpios = <&gpio_pca 1 GPIO_ACTIVE_HIGH>;
+-    // };
++    bluetooth: cyw {
++		max-speed = <460800>;
++		compatible = "brcm,bcm43438-bt";
++		shutdown-gpios = <&gpio_pca 1 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &serial2 {
+@@ -370,7 +370,6 @@ &cdns_usb3 {
+     phy-names = "cdns3,usb3-phy";
+     disconnected-overcurrent;
+     pinctrl-names = "default";
+-    // pinctrl-0 = <&pinctrl_usb_overcurrent_n_in>, <&pinctrl_usb_drive_vbus_out>;
+     pinctrl-0 = <&pinctrl_usb_overcurrent_n_in>;
+ };
+ 
+-- 
+2.47.0
+
+From 3cd974db4c9cca6d1638ef4d07b3069298cb2b84 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 25 Nov 2024 10:21:20 +0200
+Subject: [PATCH 4/4] HB IIOT: Fix gpio expander interrupts, enable touchscreen
+
+---
+ .../boot/dts/hailo/hummingboard-iiot.dtsi     | 133 ++++++++++--------
+ 1 file changed, 76 insertions(+), 57 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+index e6d9bbcfa9e2..e524c202744c 100644
+--- a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
++++ b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+@@ -27,15 +27,20 @@ mipi_backlight: backlight {
+         gpios = <&gpio_dsi_expander 3 GPIO_ACTIVE_LOW>;
+         default-on;
+     };
++};
+ 
+-    
++&pinctrl {
++    pinctrl_gpio25: gpio25_grp {
++        function = "gpio";
++        groups = "gpio25_grp";
++    };
+ };
+ 
+ &i2c_2 {
+     status = "okay";
+ 
+     tca6416_20: gpio@20 {
+-        compatible = "ti,tca6416";
++        compatible = "nxp,pcal6416";
+         reg = <0x20>;
+         gpio-controller;
+         #gpio-cells = <2>;
+@@ -58,20 +63,25 @@ tca6416_20: gpio@20 {
+         "TCA_VIDEO_PWR_EN";
+ 
+         TCA_VIDEO_PWR_EN {
+-			gpio-hog;
+-			gpios = <15 GPIO_ACTIVE_HIGH>;
+-			output-high;
+-			line-name = "TCA_VIDEO_PWR_EN";
+-		};
++            gpio-hog;
++            gpios = <15 GPIO_ACTIVE_HIGH>;
++            output-high;
++            line-name = "TCA_VIDEO_PWR_EN";
++        };
+     };
+ 
+     tca6416_21: gpio@21 {
+-        compatible = "ti,tca6416";
++        pinctrl-names = "default";
++        pinctrl-0 = <&pinctrl_gpio25>;
++
++        compatible = "nxp,pcal6416";
+         reg = <0x21>;
+         gpio-controller;
+         #gpio-cells = <2>;
+-        // interrupt-parent = <&gpio1>;
+-        // interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
++        interrupt-controller;
++        #interrupt-cells = <2>;
++        interrupt-parent = <&gpio1>;
++        interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
+         gpio-line-names =
+         "TCA_SPI_TPM/EXT",
+         "TCA_TPM_RST#",
+@@ -179,19 +189,19 @@ i2c-switch@70 {
+         compatible = "nxp,pca9546";
+         reg = <0x70>;
+         #address-cells = <1>;
+-		#size-cells = <0>;
++        #size-cells = <0>;
+         reset-gpios = <&tca6416_21 2 GPIO_ACTIVE_LOW>;
+ 
+-		i2c_ext: i2c@0 {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			reg = <0>;
+-		};
+-		
++        i2c_ext: i2c@0 {
++            #address-cells = <1>;
++            #size-cells = <0>;
++            reg = <0>;
++        };
++
+         i2c_csi: i2c@1 {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			reg = <1>;
++            #address-cells = <1>;
++            #size-cells = <0>;
++            reg = <1>;
+ 
+             // sensor_1: imx219@10 {
+             //     compatible = "sony,imx219";
+@@ -210,43 +220,20 @@ i2c_csi: i2c@1 {
+             //         };
+             //     };
+             // };
+-		};
+-		
++        };
++
+         i2c_dsi: i2c@2 {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			reg = <2>;
+-		};
+-
+-		i2c_lvds: i2c@3 {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			reg = <3>;
+-            
+-            gpio_lvds_expander: tca6408@20 {
+-		        compatible = "ti,tca6408";
+-		        reg = <0x20>;
+-		        gpio-controller;
+-		        #gpio-cells = <2>;
+-                vcc-supply = <&lcd_i2c_rst>;
+-                gpio-line-names = 
+-                "SELB",
+-                "LVDS_RESET",
+-                "LVDS_STBYB",
+-                "LVDS_PWM_BL",
+-                "LVDS_L/R",
+-                "LVDS_U/D",
+-                "LVDS_CTP_/RST",
+-                "NC";
+-	        };
++            #address-cells = <1>;
++            #size-cells = <0>;
++            reg = <2>;
+ 
+             gpio_dsi_expander: tca6408@21 {
+-		        compatible = "ti,tca6408";
+-		        reg = <0x21>;
+-		        gpio-controller;
+-		        #gpio-cells = <2>;
++                compatible = "ti,tca6408";
++                reg = <0x21>;
++                gpio-controller;
++                #gpio-cells = <2>;
+                 vcc-supply = <&lcd_i2c_rst>;
+-                gpio-line-names = 
++                gpio-line-names =
+                 "NC",
+                 "DSI_RESET",
+                 "DSI_STBYB",
+@@ -254,9 +241,41 @@ gpio_dsi_expander: tca6408@21 {
+                 "DSI_L/R",
+                 "DSI_U/D",
+                 "DSI_CTP_/RST",
+-	            "NC";
++                "NC";
++            };
++
++            touchscreen@41 {
++                /* ili2130 part of the Winstart Display WJ70N3TYJHMNG0 */
++                compatible = "ilitek,ili2130";
++                reg = <0x41>;
++                interrupt-parent = <&tca6416_21>;
++                interrupts = <13 IRQ_TYPE_EDGE_FALLING>;// <13 IRQ_TYPE_LEVEL_LOW>;
++                reset-gpios = <&gpio_dsi_expander 6 GPIO_ACTIVE_LOW>; // DSI_CTP/RST U48_P[6] (External Reset, Low is active)
+             };
+-		};
++        };
++
++        i2c_lvds: i2c@3 {
++            #address-cells = <1>;
++            #size-cells = <0>;
++            reg = <3>;
++
++            gpio_lvds_expander: tca6408@20 {
++                compatible = "ti,tca6408";
++                reg = <0x20>;
++                gpio-controller;
++                #gpio-cells = <2>;
++                vcc-supply = <&lcd_i2c_rst>;
++                gpio-line-names =
++                "SELB",
++                "LVDS_RESET",
++                "LVDS_STBYB",
++                "LVDS_PWM_BL",
++                "LVDS_L/R",
++                "LVDS_U/D",
++                "LVDS_CTP_/RST",
++                "NC";
++            };
++        };
+     };
+ 
+     /* usb_hub: CYUSB3304@60 {}; */
+@@ -279,7 +298,7 @@ carrier_tpm: tpm@0 {
+             reg = <0>;
+             spi-max-frequency = <6250000>;
+         };
+-        
++
+         carrier_conn: carrier_conn_spi@1 {
+             status = "disabled";
+             compatible = "hailo,hailo-spi-slave-test";
+@@ -289,7 +308,7 @@ carrier_conn: carrier_conn_spi@1 {
+     };
+ };
+ 
+-&usb3 {
++&hailo_usb3 {
+     status = "okay";
+ };
+ 
+-- 
+2.47.0
+
