@@ -25,7 +25,7 @@ repos:
     url: "https://github.com/sbabic/meta-swupdate.git"
     commit: 58878bb980877f51b607d71c3648bd479d68e2a5
     layers:
-      .: excluded
+      .:
   meta-arm:
     url: "https://git.yoctoproject.org/meta-arm"
     commit: c39bb4ce3b60b73d35c5fb06af012432e70d6b38
