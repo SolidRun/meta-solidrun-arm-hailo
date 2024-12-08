@@ -118,7 +118,7 @@ jobs:
             cat conf/local.conf
             bitbake -c cleanall scu-bl scu-fw u-boot u-boot-tfa-image trusted-firmware-a-hailo
             bitbake core-image-minimal --runall=fetch
-            bitbake core-image-minimal
+            bitbake core-image-minimal hailo-update-image
     
       - name: Update cache on the server  
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -148,11 +148,13 @@ jobs:
             cp $BUILD_PATH/hailo15_scu_bl.bin deploy/
             cp $BUILD_PATH/hailo15_scu_fw.bin deploy/
             cp $BUILD_PATH/scu_bl_cfg_a.bin deploy/
+            cp $BUILD_PATH/scu_bl_cfg_b.bin deploy/
             cp $BUILD_PATH/u-boot.dtb.signed deploy/
             cp $BUILD_PATH/u-boot-initial-env deploy/
             cp $BUILD_PATH/u-boot-spl.bin deploy/
             cp $BUILD_PATH/u-boot-tfa.itb deploy/
             cp $BUILD_PATH/hailo15_uart_recovery_fw.bin deploy/
+            cp $BUILD_PATH/hailo-update-image-hailo15-solidrun.swu deploy/
             cp hailo15_board_tools*.whl deploy/
 
       - name: Deploy to the local minio storage
