@@ -6,7 +6,7 @@ repos:
     url: https://github.com/hailo-ai/meta-hailo-soc/
     commit: 658be45b11e753f0a969ebd29a49eb6e47743e26
     layers:
-      meta-hailo-bsp-examples: excluded
+      meta-hailo-bsp-examples:
       meta-hailo-bsp:
       meta-hailo-dsp:
       meta-hailo-imaging:
