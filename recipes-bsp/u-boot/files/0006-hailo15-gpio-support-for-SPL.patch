@@ -1,0 +1,54 @@
+From a028f031911085314bc1f758e1db93f1c5414d94 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 8 Dec 2024 15:47:02 +0200
+Subject: [PATCH 2/4] hailo15: gpio support for SPL
+
+---
+ drivers/gpio/Makefile          | 2 +-
+ drivers/pinctrl/hailo/Kconfig  | 6 ++++++
+ drivers/pinctrl/hailo/Makefile | 2 +-
+ 3 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index dcfe0a04df..181d1f1951 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -44,7 +44,7 @@ obj-$(CONFIG_MPC83XX_SPISEL_BOOT)	+= mpc83xx_spisel_boot.o
+ obj-$(CONFIG_SH_GPIO_PFC)	+= sh_pfc.o
+ obj-$(CONFIG_OMAP_GPIO)	+= omap_gpio.o
+ obj-$(CONFIG_BCM2835_GPIO)	+= bcm2835_gpio.o
+-obj-$(CONFIG_CMSDK_GPIO)	+= cmsdk_gpio.o
++obj-$(CONFIG_$(SPL_)CMSDK_GPIO)	+= cmsdk_gpio.o
+ obj-$(CONFIG_XILINX_GPIO)	+= xilinx_gpio.o
+ obj-$(CONFIG_ADI_GPIO2)	+= adi_gpio2.o
+ obj-$(CONFIG_TCA642X)		+= tca642x.o
+diff --git a/drivers/pinctrl/hailo/Kconfig b/drivers/pinctrl/hailo/Kconfig
+index cb2f22cae0..53b0c539e1 100644
+--- a/drivers/pinctrl/hailo/Kconfig
++++ b/drivers/pinctrl/hailo/Kconfig
+@@ -2,5 +2,11 @@
+ config PINCTRL_HAILO15
+ 	bool "HAILO15 pinctrl driver"
+ 	depends on MACH_HAILO15_FAMILY && PINCTRL
++	help
++	  Say yes here to provide support for HAILO15 driver.
++
++config SPL_PINCTRL_HAILO15
++	bool "HAILO15 pinctrl driver"
++	depends on MACH_HAILO15_FAMILY && SPL_PINCTRL
+ 	help
+ 	  Say yes here to provide support for HAILO15 driver.
+\ No newline at end of file
+diff --git a/drivers/pinctrl/hailo/Makefile b/drivers/pinctrl/hailo/Makefile
+index c2ea286bf6..48e3e5e04f 100644
+--- a/drivers/pinctrl/hailo/Makefile
++++ b/drivers/pinctrl/hailo/Makefile
+@@ -1,2 +1,2 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+-obj-$(CONFIG_PINCTRL_HAILO15)	+= pinctrl-hailo15.o
+\ No newline at end of file
++obj-$(CONFIG_$(SPL_)PINCTRL_HAILO15)	+= pinctrl-hailo15.o
+\ No newline at end of file
+-- 
+2.47.0
+
