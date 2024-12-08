@@ -876,3 +876,280 @@ index ee539dbeb2..734ab81dde 100644
 -- 
 2.47.0
 
+
+From 80a2831167ce38f8f0cc9905c5798f40a10d9782 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 8 Dec 2024 15:53:17 +0200
+Subject: [PATCH 3/4] hailo15-solidrun: option to force uart boot with gpio
+
+---
+ arch/arm/dts/hailo15-solidrun.dts  | 87 ++++++++++++++++++------------
+ board/hailo/common/hailo15_spl.c   | 38 +++++++++++--
+ configs/hailo15_solidrun_defconfig |  8 +++
+ 3 files changed, 96 insertions(+), 37 deletions(-)
+
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+index 1e7deb6615..e1a695b077 100644
+--- a/arch/arm/dts/hailo15-solidrun.dts
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -25,6 +25,21 @@
+ //     uart-0-reverse-cts;
+ // };
+ 
++&gpio0 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_gpio1>;
++    u-boot,dm-pre-reloc;
++    u-boot,dm-spl;
++
++    boot_conf_hog: boot_conf_hog {
++		gpio-hog;
++		gpios = <1 GPIO_ACTIVE_HIGH>;
++		input;
++		line-name = "boot_conf_hog";
++        u-boot,dm-spl;
++        u-boot,dm-pre-reloc;
++    };
++};
+ 
+ /* SDIO0 should be enabled in u-boot in order to work in Linux  */
+ &sdio0 {
+@@ -87,6 +102,10 @@
+         groups = "i2c2_1_grp";
+     };
+ 
++    pinctrl_gpio1: gpio1 {
++        function = "gpio";
++        groups = "gpio1_grp";
++    };
+ };
+ 
+ &i2c_0 {
+@@ -97,40 +116,40 @@
+ 		reg = <0x50>;
+ 	};
+ 
+-    pca9539: pca9539@74 {
+-		compatible = "nxp,pca9539";
+-		reg = <0x74>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-        reset-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+-        gpio-line-names =
+-        "pca_0_WL_REG_ON",
+-        "pca_1_BT_REG_ON",
+-        "pca_2_ETH_RST",
+-        "pca_3_ENET_nINT",
+-        "pca_4",
+-        "pca_8_H_PCIE_PERST_N",
+-        "pca_9_H_PCIE_CLKREQ_N",
+-        "pca_10_H_PCIE_WAKE_N",
+-        "pca_11_PCIE_nCLK_N",
+-        "pca_12",
+-        "pca_13",
+-        "pca_14",
+-        "pca_15";
+-
+-        WIFI_HOG {
+-			gpio-hog;
+-			gpios = <0 GPIO_ACTIVE_HIGH>;
+-			output-low;
+-			line-name = "WL_REG_ON";
+-		};
+-        BT_HOG {
+-			gpio-hog;
+-			gpios = <1 GPIO_ACTIVE_HIGH>;
+-			output-low;
+-			line-name = "WL_REG_ON";
+-		};
+-    };
++    // pca9539: pca9539@74 {
++	// 	compatible = "nxp,pca9539";
++	// 	reg = <0x74>;
++	// 	gpio-controller;
++	// 	#gpio-cells = <2>;
++    //     reset-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
++    //     gpio-line-names =
++    //     "pca_0_WL_REG_ON",
++    //     "pca_1_BT_REG_ON",
++    //     "pca_2_ETH_RST",
++    //     "pca_3_ENET_nINT",
++    //     "pca_4",
++    //     "pca_8_H_PCIE_PERST_N",
++    //     "pca_9_H_PCIE_CLKREQ_N",
++    //     "pca_10_H_PCIE_WAKE_N",
++    //     "pca_11_PCIE_nCLK_N",
++    //     "pca_12",
++    //     "pca_13",
++    //     "pca_14",
++    //     "pca_15";
++
++    //     WIFI_HOG {
++	// 		gpio-hog;
++	// 		gpios = <0 GPIO_ACTIVE_HIGH>;
++	// 		output-low;
++	// 		line-name = "WL_REG_ON";
++	// 	};
++    //     BT_HOG {
++	// 		gpio-hog;
++	// 		gpios = <1 GPIO_ACTIVE_HIGH>;
++	// 		output-low;
++	// 		line-name = "WL_REG_ON";
++	// 	};
++    // };
+ };
+ 
+ &i2c_2 {
+diff --git a/board/hailo/common/hailo15_spl.c b/board/hailo/common/hailo15_spl.c
+index 734ab81dde..0c07dcc002 100644
+--- a/board/hailo/common/hailo15_spl.c
++++ b/board/hailo/common/hailo15_spl.c
+@@ -8,6 +8,7 @@
+ #include <env.h>
+ #include <hang.h>
+ #include "hailo15_board.h"
++#include <asm/gpio.h>
+ #ifdef CONFIG_SPL_ENV_IS_IN_MMC
+ #include "mmc.h"
+ #endif
+@@ -27,19 +28,51 @@ void spl_board_init(void)
+ 	}
+ }
+ 
++int spl_check_boot_gpio1(void)
++{
++	struct gpio_desc *gpio;
++	int ret;
++	ret = gpio_hog_lookup_name("boot_conf_hog", &gpio);
++	if (ret) {
++		printf("%s: gpio_hog_lookup_name returned %d\n", __func__, ret);
++		return ret;
++	}
++
++	ret = dm_gpio_get_value(gpio);
++	if (ret < 0)
++	{
++		printf("%s: Failed to get spl_boot_config_gpio: %d\n", __func__, ret);
++	}
++	return ret;
++}
++
+ void board_boot_order(u32 *spl_boot_list)
+ {
+ 	const char *s;
+-
++#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
++	int boot_gpio;
++	boot_gpio = spl_check_boot_gpio1();
++#endif
+ 	env_init();
+ 	env_load();
+ 
+ 	s = env_get("spl_boot_source");
++#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
++	if (!s) {
++		puts("failed to get 'spl_boot_source' from env, falling back to mmc2\n");
++		s = "mmc2";
++	}
++	if (boot_gpio == 1)
++	{
++		puts("Boot source is forced to uart with DIP switch\n");
++		s = "uart";
++	} 
++#else
+ 	if (!s) {
+ 		puts("failed to get 'spl_boot_source' from env, falling back to mmc12\n");
+ 		s = "mmc12";
+ 	}
+-
++#endif
+ 	if (!strcmp(s, "mmc1")) {
+ 		spl_boot_list[0] = BOOT_DEVICE_MMC1;
+ #ifdef CONFIG_TARGET_HAILO15L_OREGANO
+@@ -80,7 +113,6 @@ void board_boot_order(u32 *spl_boot_list)
+ 		spl_boot_list[1] = BOOT_DEVICE_MMC2;
+ #endif
+ 	}
+-
+ 	printf("U-Boot SPL boot source %s\n", s);
+ }
+ 
+diff --git a/configs/hailo15_solidrun_defconfig b/configs/hailo15_solidrun_defconfig
+index b02099a571..aebfe8f573 100644
+--- a/configs/hailo15_solidrun_defconfig
++++ b/configs/hailo15_solidrun_defconfig
+@@ -28,3 +28,11 @@ CONFIG_CMD_WGET=y
+ 
+ CONFIG_CMD_ERASEENV=y
+ CONFIG_BOARD_LATE_INIT=y
++
++CONFIG_SPL_PINCTRL=y
++CONFIG_SPL_PINCTRL_HAILO15=y
++CONFIG_SPL_GPIO=y
++CONFIG_SPL_CMSDK_GPIO=y
++CONFIG_SPL_DM_GPIO=y
++CONFIG_SPL_DM_GPIO_LOOKUP_LABEL=y
++CONFIG_SPL_GPIO_HOG=y
+-- 
+2.47.0
+
+From e6359d0e895cca8aa1cefa7d029aca54192679d0 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 8 Dec 2024 15:53:40 +0200
+Subject: [PATCH 4/4] hailo15-solidrun: swupdate support
+
+---
+ include/configs/hailo15-solidrun.h | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
+
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+index 7f19a45bf9..920c77b526 100644
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -21,6 +21,7 @@
+     /* Try all boot options by order */ \
+     "bootmenu_0=Boot from eMMC=run boot_mmc1\0" \
+     "bootmenu_1=Boot to flashing ramdisk=run boot_flashing_ramdisk\0" \
++    "bootmenu_2=SWUpdate=run boot_swupdate_mmc\0" \
+     "default_spl_boot_source=mmc2\0" \
+     "spl_boot_source=mmc2\0"
+ 
+@@ -50,27 +51,18 @@
+     "write_rootfs_to_mmc=setexpr rootfs_sdblock_count ${filesize} / ${sd_block_size} && setexpr rootfs_sdblock_count ${rootfs_sdblock_count} + 1; " UNNEEDED_MMCINFO_HACK " run get_rootfs_partition_start_offset && mmc write ${far_ram_addr} ${rootfs_partition_start_offset} ${rootfs_sdblock_count}\0" \
+     /* tftpboot sets filesize to the size it loaded */\
+     "download_wic_to_ram=wget ${far_ram_addr} ${serverip}/:core-image-minimal-" CONFIG_SYS_BOARD ".wic\0" \
+-    "download_rootfs_to_ram=wget ${far_ram_addr} ${serverip}/:core-image-minimal-" CONFIG_SYS_BOARD ".ext4\0" \
+-    "download_fitimage_to_ram=wget ${far_ram_addr} ${serverip}/:fitImage\0" \
+-    "download_uboot_to_ram=wget ${far_ram_addr} ${serverip}/:" CONFIG_SPL_FS_LOAD_PAYLOAD_NAME "\0" \
+     "boot_mmc=run bootargs_base bootargs_mmc && run load_fitimage_from_mmc && bootm ${far_ram_addr}${fit_image_conf}\0" \
+     "boot_mmc0=run set_mmc0_device_num && run boot_mmc\0"\
+     "boot_mmc1=run set_mmc1_device_num && run boot_mmc\0"\
+     "boot_flashing_ramdisk=run bootargs_base bootargs_mmc; wget ${far_ram_addr} ${serverip}/:${flashing_ramdisk_name}; bootm\0" \
+     "update_wic=run download_wic_to_ram && run write_wic_to_mmc\0" \
+-    "update_wic_mmc0=run set_mmc0_device_num && run update_wic\0" \
+     "update_wic_mmc1=run set_mmc1_device_num && run update_wic\0" \
+-    "update_rootfs=run download_rootfs_to_ram && run write_rootfs_to_mmc\0" \
+-    "update_fitimage=run download_fitimage_to_ram && run write_fitimage_to_mmc\0" \
+-    "update_uboot=run download_uboot_to_ram && run write_uboot_to_mmc\0" \
+-    "update_uboot_mmc0_mmc1=run download_uboot_to_ram && run write_uboot_to_mmc0_mmc1\0" \
+-    "update_partitions_mmc0=run set_mmc0_device_num && run update_partitions\0"\
+-    "update_partitions_mmc1=run set_mmc1_device_num && run update_partitions\0"\
+     "nfsroot=/mnt/hailo15_nfs/\0"\
+     "bootnfs=run download_fitimage_to_ram && run bootargs_base bootargs_nfs && bootm ${far_ram_addr}${fit_image_conf}\0" \
+     "auto_uboot_update=run update_uboot_mmc0_mmc1; env set auto_uboot_update_enable no && env set spl_boot_source ${default_spl_boot_source} && env set bootdelay ${default_bootdelay} && saveenv\0" \
+     "auto_uboot_update_enable=no\0" \
+     "default_bootdelay=2\0" \
++    SWUPDATE_EXTRA_ENV_SETTINGS \
+     BOOTMENU \
+     UPDATE_PARTITIONS_COMMAND
+ 
+@@ -105,4 +97,4 @@
+ 
+ #endif
+ 
+-#endif /* __HAILO15_SOLIDRUN_H */
+\ No newline at end of file
++#endif /* __HAILO15_SOLIDRUN_H */
+-- 
+2.47.0
+
