@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# stop upon error
+set -e
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+function exit_trap() {
+    # sometimes exiting the process results in the last prints from being cut
+    # because the system reboots right after the exit. So we add a small sleep
+    sleep 3
+}
+
+# This function, called after swupdate finished, updates scu_bl_cfg file with boot_image_mode field set to 0
+function post_swupdate_modify_scu_bl_cfg_bin()
+{
+    current_copy=$(/etc/get_sw_image.sh --next)
+
+    # handling of boot_image_mode is only relevant to image a
+    if [ "${current_copy}" = "a" ]; then
+        scu_bl_cfg_filename="/etc/scu_bl_cfg/scu_bl_cfg_a.bin"
+
+        # Write to offset 0x5000 the original SCU bootloader configuration - which has boot_image_mode field set to 0 -
+        dd if=${scu_bl_cfg_filename} of=/dev/mtdblock0 bs=4096 count=1 seek=5 2>/dev/null
+
+        # Write to offset 0x6000 the original SCU bootloader configuration - which has boot_image_mode field set to 0 -
+        dd if=${scu_bl_cfg_filename} of=/dev/mtdblock0 bs=4096 count=1 seek=6 2>/dev/null
+    fi
+}
+
+function run_swupdate() {
+    cd /tmp
+    echo "Downloading ${SWUPDATE_UPDATE_FILENAME} from ${SWUPDATE_SERVER_IP} via HTTP..."
+    wget "http://${SWUPDATE_SERVER_IP}/${SWUPDATE_UPDATE_FILENAME}"
+
+    for update_mode in ${SWUPDATE_UPDATE_MODES//,/ }
+    do
+        echo "*******************************************"
+        echo
+        echo "Running: swupdate with mode ${update_mode}"
+        echo
+        echo "*******************************************"
+        swupdate -i "${SWUPDATE_UPDATE_FILENAME}" -v -m -M -e "stable,${update_mode}"
+    done
+    echo "SWUpdate finished"
+
+    post_swupdate_modify_scu_bl_cfg_bin
+
+    echo "Rebooting..."
+    reboot -f
+
+    return 0
+}
+
+function main() {
+    umask 022
+    mount -t proc proc /proc
+    mount -t sysfs sysfs /sys
+    mount -o size=4G -t tmpfs tmpfs /tmp
+    # disable kernel print to serial
+    echo 0 >/proc/sys/kernel/printk
+
+    ln -s /tmp /var/volatile
+
+    # These parameters come from the kernel command line
+    # so we want to make sure that they are not empty
+    if [[ -z "${SWUPDATE_SERVER_IP}" || \
+          -z "${SWUPDATE_SERVER_UDP_LOGGING_PORT}" || \
+          -z "${SWUPDATE_UPDATE_MODES}" || \
+          -z "${SWUPDATE_UPDATE_FILENAME}" ]]; then
+        echo "Missing kernel command line parameters"
+        echo "SWUPDATE_SERVER_IP: ${SWUPDATE_SERVER_IP}"
+        echo "SWUPDATE_SERVER_UDP_LOGGING_PORT: ${SWUPDATE_SERVER_UDP_LOGGING_PORT}"
+        echo "SWUPDATE_UPDATE_FILENAME: ${SWUPDATE_UPDATE_FILENAME}"
+        echo "SWUPDATE_UPDATE_MODES: ${SWUPDATE_UPDATE_MODES}"
+        exit 1
+    fi
+
+    /etc/init.d/networking start
+
+    echo "Waiting for networking service is up..."
+
+    # Waiting for networking sericve is up
+    sleep 10
+
+    # The goal is to dump SW update output to both stdout and to remote 'nc' listener.
+    run_swupdate |& tee /proc/self/fd/2 | nc -u "${SWUPDATE_SERVER_IP}" "${SWUPDATE_SERVER_UDP_LOGGING_PORT}"
+
+    return 0
+}
+
+trap exit_trap EXIT
+
+main
+
+exit 0
