@@ -45,6 +45,13 @@ source poky/oe-init-build-env
 bitbake core-image-minimal
 ```
 
+### 2. Build the update package
+```bash
+bitbake hailo-update-image
+```
+By default core-image-minimal is used as an update target. To change it, update the local.conf:
+`HAILO_TARGET = "core-image-custom"`
+
 ## Build in the docker
 It is recommended to use docker image in order to have consistent build environment.
 1. Create a docker container:
@@ -57,13 +64,6 @@ docker run -it -u "$(id -u):$(id -g)" -v ${PWD}:/work --workdir=/work build_hail
 ```
 3. Run the build as described in the [Build Steps](#build-steps)
 
-## Selecting camera.
-This layer support two cameras: imx334 and imx678. imx334 is used by default; To use imx678 modify the local.conf file:
-
-```patch
--MACHINE_FEATURES += "imx334"
-+MACHINE_FEATURES += "imx678"
-```
 ## Output Artifacts
 
 Output artifacts are located in the  
