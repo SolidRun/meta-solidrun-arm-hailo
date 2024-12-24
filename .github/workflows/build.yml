@@ -119,6 +119,7 @@ jobs:
             bitbake -c cleanall scu-bl scu-fw u-boot u-boot-tfa-image trusted-firmware-a-hailo
             bitbake core-image-minimal --runall=fetch
             bitbake core-image-minimal hailo-update-image
+            bitbake core-image-minimal -c populate_sdk
     
       - name: Update cache on the server  
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -140,6 +141,7 @@ jobs:
         run: |
             mkdir deploy
             BUILD_PATH=build/tmp/deploy/images/hailo15-solidrun
+            SDK_PATH=build/tmp/deploy/sdk
             cp $BUILD_PATH/core-image-minimal-hailo15-solidrun.wic.zst deploy/
             cp $BUILD_PATH/core-image-minimal-hailo15-solidrun.wic.bmap deploy/
             cp $BUILD_PATH/customer_certificate.bin deploy/
@@ -155,6 +157,7 @@ jobs:
             cp $BUILD_PATH/u-boot-tfa.itb deploy/
             cp $BUILD_PATH/hailo15_uart_recovery_fw.bin deploy/
             cp $BUILD_PATH/hailo-update-image-hailo15-solidrun.swu deploy/
+            cp $SDK_PATH/poky-glibc-x86_64-core-image-minimal-armv8a-hailo15-solidrun-toolchain-4.0.2.sh deploy/
             cp hailo15_board_tools*.whl deploy/
 
       - name: Deploy to the local minio storage
