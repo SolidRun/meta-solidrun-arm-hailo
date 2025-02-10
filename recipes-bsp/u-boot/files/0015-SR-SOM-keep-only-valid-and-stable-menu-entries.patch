@@ -1,0 +1,50 @@
+From fb2616447c4e9cc7f04813e4890486baabd8729d Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 25 Nov 2024 15:48:21 +0200
+Subject: [PATCH 15/20] SR SOM: keep only valid and stable menu entries
+
+---
+ include/configs/hailo15-solidrun.h | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
+
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+index bdcaac6b43..7f19a45bf9 100644
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -19,15 +19,8 @@
+ 
+ #define BOOTMENU \
+     /* Try all boot options by order */ \
+-    "bootmenu_0=Autodetect=" \
+-        "if test \"${auto_uboot_update_enable}\" = \"yes\"; then run auto_uboot_update; exit 1; fi; " \
+-        "echo Trying Boot from eMMC; run boot_mmc1;" \
+-        "echo Trying Boot from NFS; run bootnfs;" \
+-        "echo ERROR: All boot options failed\0" \
+-    "bootmenu_1=Boot from eMMC=run boot_mmc1\0" \
+-    "bootmenu_2=Update eMMC (wic) from HTTP=run update_wic_mmc1 && bootmenu -1\0" \
+-    "bootmenu_3=Update eMMC (partitions) from HTTP=run update_partitions_mmc1 && bootmenu -1\0" \
+-    "bootmenu_4=Boot from NFS=run bootnfs\0" \
++    "bootmenu_0=Boot from eMMC=run boot_mmc1\0" \
++    "bootmenu_1=Boot to flashing ramdisk=run boot_flashing_ramdisk\0" \
+     "default_spl_boot_source=mmc2\0" \
+     "spl_boot_source=mmc2\0"
+ 
+@@ -44,6 +37,7 @@
+     "sd_block_size=200\0" /* in hex, taken from running mmcinfo */\
+     "serverip=10.0.0.2\0" \
+     "ipaddr=10.0.0.1\0" \
++    "flashing_ramdisk_name=fitImage-core-image-flashing-ramdisk-hailo15-solidrun-hailo15-solidrun\0" \
+     "set_mmc0_device_num= setenv device_num 0 && mmc dev ${device_num}\0" \
+     "set_mmc1_device_num= setenv device_num 1 && mmc dev ${device_num}\0" \
+     "load_fitimage_from_mmc=" UNNEEDED_MMCINFO_HACK " fatload mmc ${device_num}:${mmc_boot_partition} ${far_ram_addr} fitImage\0" \
+@@ -62,6 +56,7 @@
+     "boot_mmc=run bootargs_base bootargs_mmc && run load_fitimage_from_mmc && bootm ${far_ram_addr}${fit_image_conf}\0" \
+     "boot_mmc0=run set_mmc0_device_num && run boot_mmc\0"\
+     "boot_mmc1=run set_mmc1_device_num && run boot_mmc\0"\
++    "boot_flashing_ramdisk=run bootargs_base bootargs_mmc; wget ${far_ram_addr} ${serverip}/:${flashing_ramdisk_name}; bootm\0" \
+     "update_wic=run download_wic_to_ram && run write_wic_to_mmc\0" \
+     "update_wic_mmc0=run set_mmc0_device_num && run update_wic\0" \
+     "update_wic_mmc1=run set_mmc1_device_num && run update_wic\0" \
+-- 
+2.47.1
+

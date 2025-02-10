@@ -1,0 +1,329 @@
+From 2edb7fe2f556bdf130f589a6654b668b6ea5fe25 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Tue, 6 Aug 2024 15:23:59 +0300
+Subject: [PATCH 13/20] SR carrier selection support
+
+---
+ arch/arm/dts/hailo15-solidrun.dts             |  22 ++-
+ .../hailo/hailo15-solidrun/hailo15_solidrun.c | 150 ++++++++++++++++++
+ configs/hailo15_solidrun_defconfig            |   7 +
+ include/configs/hailo15-solidrun.h            |  61 ++++++-
+ 4 files changed, 236 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+index 7db9765237..0823ee0180 100644
+--- a/arch/arm/dts/hailo15-solidrun.dts
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -15,6 +15,7 @@
+ 
+ 	aliases {
+ 		eeprom_som = &eeprom_som;
++        eeprom_carrier = &eeprom_carrier;
+ 	};
+ };
+ 
+@@ -59,6 +60,12 @@
+                "eth_rgmii_txd_3";
+         drive-strength = <2>;
+     };
++
++    pinctrl_i2c2: i2c2 {
++        function = "i2c2";
++        groups = "i2c2_1_grp";
++    };
++
+ };
+ 
+ &i2c_0 {
+@@ -74,6 +81,7 @@
+ 		reg = <0x74>;
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++        reset-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+         gpio-line-names =
+         "pca_0_WL_REG_ON",
+         "pca_1_BT_REG_ON",
+@@ -102,4 +110,16 @@
+ 			line-name = "WL_REG_ON";
+ 		};
+     };
+-};
+\ No newline at end of file
++};
++
++&i2c_2 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_i2c2>;
++
++    eeprom_carrier: at24c02@57 {
++        compatible = "atmel,24c02";
++        reg = <0x57>;
++        pagesize = <16>;
++    };
++};
+diff --git a/board/hailo/hailo15-solidrun/hailo15_solidrun.c b/board/hailo/hailo15-solidrun/hailo15_solidrun.c
+index 318226cba4..8fd5c700e2 100644
+--- a/board/hailo/hailo15-solidrun/hailo15_solidrun.c
++++ b/board/hailo/hailo15-solidrun/hailo15_solidrun.c
+@@ -1,4 +1,149 @@
+ #include <common.h>
++#include <dm/uclass.h>
++#include <env.h>
++#include <linux/err.h>
++#include <tlv_eeprom.h>
++
++
++#define CARRIER_SKU_MAX_SIZE 25
++#define FIT_CONF_ENV "fit_image_conf"
++
++/* '#' in the beginning of the configuration name is a part of bootm syntax */
++#define FIT_CONF_HB_IIOT "#conf-hailo_hailo15-solidrun.dtb" // default
++#define FIT_CONF_HB_PRO "#conf-hailo_hailo15-solidrun-hb-pro.dtb"
++
++enum carrier_boards
++{
++	CARRIER_UNRECOGNIZED = 0,
++	CARRIER_HB_MATE,
++	CARRIER_HB_RIPPLE,
++	CARRIER_HB_PULSE,
++	CARRIER_HB_PRO,
++	CARRIER_HB_IIOT,
++};
++
++static int get_tlv_udevice_by_alias(struct udevice **dev, const char *alias)
++{
++	int node, ret;
++	const char *path;
++	path = fdt_get_alias(gd->fdt_blob, alias);
++	if (!path)
++	{
++		pr_err("Cannot find the path for label %s.\n", alias);
++		return -ENODEV;
++	}
++	/* Get the node offset using the path */
++	node = fdt_path_offset(gd->fdt_blob, path);
++	if (node < 0)
++	{
++		pr_err("Cannot find the node for path %s.\n", path);
++		return -ENODEV;
++	}
++
++	/* Get the udevice using the node offset */
++	ret = uclass_get_device_by_of_offset(UCLASS_I2C_EEPROM, node, dev);
++	if (ret)
++	{
++		pr_err("Failed to find eeprom device, ret=%d\n", ret);
++		return ret;
++	}
++	return 0;
++}
++
++int get_sku_from_tlv_dev(struct udevice *dev, char *sku)
++{
++	int ret = 0;
++	char eeprom[2048];
++	struct tlvinfo_priv *tlv, *entry;
++
++	tlv = tlv_eeprom_read(dev, 0, eeprom, ARRAY_SIZE(eeprom));
++	if (IS_ERR(tlv))
++	{
++		pr_err("Can't parse the tlv: %d\n", tlv);
++		return tlv;
++	}
++	entry = tlv_entry_next_by_code(tlv, NULL, TLV_CODE_PART_NUMBER);
++	if (IS_ERR(entry))
++	{
++		pr_err("Bad entry, ret: %d\n", entry);
++		return entry;
++	}
++	ret = tlv_entry_get_string(entry, sku, CARRIER_SKU_MAX_SIZE);
++	if (ret)
++	{
++		pr_err("Can't get tlv_entry_get_string, ret: %d\n", ret);
++		return ret;
++	}
++	return 0;
++}
++
++int get_carrier(void)
++{
++	int board, ret = 0;
++	struct udevice *dev;
++	char sku[CARRIER_SKU_MAX_SIZE];
++
++	ret = get_tlv_udevice_by_alias(&dev, "eeprom_carrier");
++	if (ret)
++		return ret;
++
++	ret = get_sku_from_tlv_dev(dev, sku);
++	if (ret)
++		return ret;
++
++	switch (sku[5])
++	{
++	case 'M': // Mate
++		board = CARRIER_HB_MATE;
++		break;
++	case 'R': // Ripple
++		board = CARRIER_HB_RIPPLE;
++		break;
++	case 'U': // Pulse or Extended or Pro
++		board = CARRIER_HB_PULSE;
++		if (sku[6] == 'E' || sku[6] == 'P')
++			board = CARRIER_HB_PRO;
++		break;
++	case 'I': // IIoT
++		board = CARRIER_HB_IIOT;
++		break;
++	default:
++		board = CARRIER_UNRECOGNIZED;
++		pr_warn("Did not recognise board variant in sku \"%s\"\n", sku);
++	}
++
++	return board;
++}
++
++void set_fit_image_configurations(void)
++{
++    int carrier;
++    char *fit_conf = env_get(FIT_CONF_ENV);
++    if (fit_conf != NULL)
++    {
++        printf("Keeping predefined fit config \n");
++        return;
++    }
++
++    carrier = get_carrier();
++    printf("Selecting fdt file for board %d...\n", carrier);
++	switch (carrier)
++	{
++	case CARRIER_HB_MATE:
++	case CARRIER_HB_RIPPLE:
++	case CARRIER_HB_PULSE:
++	case CARRIER_HB_PRO:
++		env_set(FIT_CONF_ENV, FIT_CONF_HB_PRO);
++		break;
++	case CARRIER_HB_IIOT:
++		env_set(FIT_CONF_ENV, FIT_CONF_HB_IIOT);
++		break;
++	default:
++		pr_warn("Leaving default fit configuration \n");
++		break;
++    }
++}
++
+ 
+ void set_mac_addr(void)
+ {
+@@ -8,3 +153,8 @@ void set_mac_addr(void)
+         puts("Failed to read MAC from TLV\n");
+     }
+ }
++
++int board_late_init(void) {
++    set_fit_image_configurations();
++    return 0;
++}
+\ No newline at end of file
+diff --git a/configs/hailo15_solidrun_defconfig b/configs/hailo15_solidrun_defconfig
+index 2380242e63..b02099a571 100644
+--- a/configs/hailo15_solidrun_defconfig
++++ b/configs/hailo15_solidrun_defconfig
+@@ -21,3 +21,10 @@ CONFIG_CMD_EEPROM=y
+ CONFIG_CMD_TLV_EEPROM=y
+ CONFIG_EEPROM_TLV_LIB=y
+ CONFIG_MAC_ADDR_IN_SPIFLASH=y
++
++CONFIG_PROT_TCP=y
++CONFIG_PROT_TCP_SACK=y
++CONFIG_CMD_WGET=y
++
++CONFIG_CMD_ERASEENV=y
++CONFIG_BOARD_LATE_INIT=y
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+index c609a3cb92..bdcaac6b43 100644
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -10,6 +10,13 @@
+ 
+ #define SWUPDATE_MMC_INDEX "1"
+ 
++#include "hailo15_common.h"
++
++#ifndef CONFIG_SPL_BUILD
++
++#undef BOOTMENU
++#undef CONFIG_EXTRA_ENV_SETTINGS
++
+ #define BOOTMENU \
+     /* Try all boot options by order */ \
+     "bootmenu_0=Autodetect=" \
+@@ -18,13 +25,61 @@
+         "echo Trying Boot from NFS; run bootnfs;" \
+         "echo ERROR: All boot options failed\0" \
+     "bootmenu_1=Boot from eMMC=run boot_mmc1\0" \
+-    "bootmenu_2=Update eMMC (wic) from TFTP=run update_wic_mmc1 && bootmenu -1\0" \
+-    "bootmenu_3=Update eMMC (partitions) from TFTP=run update_partitions_mmc1 && bootmenu -1\0" \
++    "bootmenu_2=Update eMMC (wic) from HTTP=run update_wic_mmc1 && bootmenu -1\0" \
++    "bootmenu_3=Update eMMC (partitions) from HTTP=run update_partitions_mmc1 && bootmenu -1\0" \
+     "bootmenu_4=Boot from NFS=run bootnfs\0" \
+     "default_spl_boot_source=mmc2\0" \
+     "spl_boot_source=mmc2\0"
+ 
+-#include "hailo15_common.h"
++
++#define CONFIG_EXTRA_ENV_SETTINGS \
++    "bootargs_base=setenv bootargs console=ttyS1,${baudrate}n8 earlycon rootwait rw && run bootargs_board\0" \
++    "bootargs_board=setenv bootargs ${bootargs} ${bootargs_board_options}\0" \
++    "bootargs_ram=setenv bootargs ${bootargs} root=/dev/ram0 ramdisk_size=${ramdisk_size}\0" \
++    "bootargs_mmc=setenv bootargs ${bootargs} root=/dev/mmcblk${device_num}p${mmc_rootfs_partition}\0" \
++    "bootargs_nfs=setenv bootargs ${bootargs} root=/dev/nfs rootfstype=nfs ip=${ipaddr} nfsroot=${serverip}:${nfsroot},v3,tcp\0" \
++    "ramdisk_size=0x8000000\0" \
++    "far_ram_addr=0x85000000\0" \
++    "get_rootfs_partition_start_offset=part start mmc ${device_num} ${mmc_rootfs_partition} rootfs_partition_start_offset\0" \
++    "sd_block_size=200\0" /* in hex, taken from running mmcinfo */\
++    "serverip=10.0.0.2\0" \
++    "ipaddr=10.0.0.1\0" \
++    "set_mmc0_device_num= setenv device_num 0 && mmc dev ${device_num}\0" \
++    "set_mmc1_device_num= setenv device_num 1 && mmc dev ${device_num}\0" \
++    "load_fitimage_from_mmc=" UNNEEDED_MMCINFO_HACK " fatload mmc ${device_num}:${mmc_boot_partition} ${far_ram_addr} fitImage\0" \
++    "write_fitimage_to_mmc=" UNNEEDED_MMCINFO_HACK " fatwrite mmc ${device_num}:${mmc_boot_partition} ${far_ram_addr} fitImage ${filesize}\0" \
++    "write_uboot_to_mmc=" UNNEEDED_MMCINFO_HACK " fatwrite mmc ${device_num}:${mmc_boot_partition} ${far_ram_addr} " CONFIG_SPL_FS_LOAD_PAYLOAD_NAME " ${filesize}\0" \
++    "write_uboot_to_mmc0_mmc1=run set_mmc0_device_num && run write_uboot_to_mmc; run set_mmc1_device_num && run write_uboot_to_mmc\0" \
++    /* "mmc write" writes in blocks, so we first calculate the number of blocks we read into wic_sdblock_count. */\
++    /* we assume this is called after 'tftpboot' - so filesize is populated */\
++    "write_wic_to_mmc=setexpr wic_sdblock_count ${filesize} / ${sd_block_size} && setexpr wic_sdblock_count ${wic_sdblock_count} + 1; " UNNEEDED_MMCINFO_HACK " mmc write ${far_ram_addr} 0 ${wic_sdblock_count}\0" \
++    "write_rootfs_to_mmc=setexpr rootfs_sdblock_count ${filesize} / ${sd_block_size} && setexpr rootfs_sdblock_count ${rootfs_sdblock_count} + 1; " UNNEEDED_MMCINFO_HACK " run get_rootfs_partition_start_offset && mmc write ${far_ram_addr} ${rootfs_partition_start_offset} ${rootfs_sdblock_count}\0" \
++    /* tftpboot sets filesize to the size it loaded */\
++    "download_wic_to_ram=wget ${far_ram_addr} ${serverip}/:core-image-minimal-" CONFIG_SYS_BOARD ".wic\0" \
++    "download_rootfs_to_ram=wget ${far_ram_addr} ${serverip}/:core-image-minimal-" CONFIG_SYS_BOARD ".ext4\0" \
++    "download_fitimage_to_ram=wget ${far_ram_addr} ${serverip}/:fitImage\0" \
++    "download_uboot_to_ram=wget ${far_ram_addr} ${serverip}/:" CONFIG_SPL_FS_LOAD_PAYLOAD_NAME "\0" \
++    "boot_mmc=run bootargs_base bootargs_mmc && run load_fitimage_from_mmc && bootm ${far_ram_addr}${fit_image_conf}\0" \
++    "boot_mmc0=run set_mmc0_device_num && run boot_mmc\0"\
++    "boot_mmc1=run set_mmc1_device_num && run boot_mmc\0"\
++    "update_wic=run download_wic_to_ram && run write_wic_to_mmc\0" \
++    "update_wic_mmc0=run set_mmc0_device_num && run update_wic\0" \
++    "update_wic_mmc1=run set_mmc1_device_num && run update_wic\0" \
++    "update_rootfs=run download_rootfs_to_ram && run write_rootfs_to_mmc\0" \
++    "update_fitimage=run download_fitimage_to_ram && run write_fitimage_to_mmc\0" \
++    "update_uboot=run download_uboot_to_ram && run write_uboot_to_mmc\0" \
++    "update_uboot_mmc0_mmc1=run download_uboot_to_ram && run write_uboot_to_mmc0_mmc1\0" \
++    "update_partitions_mmc0=run set_mmc0_device_num && run update_partitions\0"\
++    "update_partitions_mmc1=run set_mmc1_device_num && run update_partitions\0"\
++    "nfsroot=/mnt/hailo15_nfs/\0"\
++    "bootnfs=run download_fitimage_to_ram && run bootargs_base bootargs_nfs && bootm ${far_ram_addr}${fit_image_conf}\0" \
++    "auto_uboot_update=run update_uboot_mmc0_mmc1; env set auto_uboot_update_enable no && env set spl_boot_source ${default_spl_boot_source} && env set bootdelay ${default_bootdelay} && saveenv\0" \
++    "auto_uboot_update_enable=no\0" \
++    "default_bootdelay=2\0" \
++    BOOTMENU \
++    UPDATE_PARTITIONS_COMMAND
++
++#endif
+ 
+ /*! @note: lpddr4 inline ecc located at the top 1/8 of the referred CS.
+  *         In regards of using LPDDR4 setup of:
+-- 
+2.47.1
+

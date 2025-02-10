@@ -45,7 +45,7 @@ source poky/oe-init-build-env
 bitbake core-image-minimal
 ```
 
-### 2. Build the update package
+#### Build the update package
 ```bash
 bitbake hailo-update-image
 ```

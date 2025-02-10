@@ -1,0 +1,88 @@
+From a8766f78e6870e0abe380692cdcd6712459233a9 Mon Sep 17 00:00:00 2001
+From: Jon Nettleton <jon@solid-run.com>
+Date: Wed, 1 Nov 2023 15:29:33 +0100
+Subject: [PATCH 02/20] Merge with initial patch for backporting
+
+Signed-off-by: Jon Nettleton <jon@solid-run.com>
+---
+ drivers/net/phy/mxl-8611x.c | 19 ++++++++++++++-----
+ drivers/net/phy/phy.c       |  3 +++
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/phy/mxl-8611x.c b/drivers/net/phy/mxl-8611x.c
+index 467edc5bb5..15ee8056c5 100644
+--- a/drivers/net/phy/mxl-8611x.c
++++ b/drivers/net/phy/mxl-8611x.c
+@@ -1,11 +1,14 @@
+ // SPDX-License-Identifier: GPL-2.0+
+ /**
+- *  Driver for MaxLinear MXL861100 Ethernet PHY
++ *  Driver for MaxLinear MXL8611X Ethernet PHYs
+  *
+  * Copyright 2023 Variscite Ltd.
+  * Copyright 2023 MaxLinear Inc.
++ * Copyright 2023 SolidRun Ltd.
+  * Author: Nate Drude <nate.d@variscite.com>
++ * Author: Jon Nettleton <jon@solid-run.com>
+  */
++
+ #include <common.h>
+ #include <phy.h>
+ #include <linux/bitops.h>
+@@ -236,17 +239,15 @@ static int mxl8611x_config(struct phy_device *phydev)
+ 
+ static int mxl86110_config(struct phy_device *phydev)
+ {
+-	printf("MXL86110 PHY detected at addr %d\n", phydev->addr);
+ 	return mxl8611x_config(phydev);
+ }
+ 
+ static int mxl86111_config(struct phy_device *phydev)
+ {
+-	printf("MXL86111 PHY detected at addr %d\n", phydev->addr);
+ 	return mxl8611x_config(phydev);
+ }
+ 
+-U_BOOT_PHY_DRIVER(mxl86110) = {
++static struct phy_driver MXL86110_driver = {
+ 	.name = "MXL86110",
+ 	.uid = PHY_ID_MXL86110,
+ 	.mask = 0xffffffff,
+@@ -258,7 +259,7 @@ U_BOOT_PHY_DRIVER(mxl86110) = {
+ 	.writeext = mxl8611x_extwrite,
+ };
+ 
+-U_BOOT_PHY_DRIVER(mxl86111) = {
++static struct phy_driver MXL86111_driver = {
+ 	.name = "MXL86111",
+ 	.uid = PHY_ID_MXL86111,
+ 	.mask = 0xffffffff,
+@@ -269,3 +270,11 @@ U_BOOT_PHY_DRIVER(mxl86111) = {
+ 	.readext = mxl8611x_extread,
+ 	.writeext = mxl8611x_extwrite,
+ };
++
++int phy_mxl8611x_init(void)
++{
++        phy_register(&MXL86110_driver);
++        phy_register(&MXL86111_driver);
++
++        return 0;
++}
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index c9fc20855b..1d87fb8859 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -526,6 +526,9 @@ int phy_init(void)
+ #ifdef CONFIG_PHY_MESON_GXL
+ 	phy_meson_gxl_init();
+ #endif
++#ifdef CONFIG_PHY_MXL8611X
++	phy_mxl8611x_init();
++#endif
+ #ifdef CONFIG_PHY_NATSEMI
+ 	phy_natsemi_init();
+ #endif
+-- 
+2.47.1
+
