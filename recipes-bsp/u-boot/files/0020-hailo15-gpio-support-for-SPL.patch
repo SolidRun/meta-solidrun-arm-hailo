@@ -1,7 +1,7 @@
-From a028f031911085314bc1f758e1db93f1c5414d94 Mon Sep 17 00:00:00 2001
+From 7473e9d0e0642a9f46b9223314b7e72c9e8d9829 Mon Sep 17 00:00:00 2001
 From: Mikhail Anikin <mikhail.anikin@solid-run.com>
 Date: Sun, 8 Dec 2024 15:47:02 +0200
-Subject: [PATCH 2/4] hailo15: gpio support for SPL
+Subject: [PATCH 20/20] hailo15: gpio support for SPL
 
 ---
  drivers/gpio/Makefile          | 2 +-
@@ -50,5 +50,5 @@ index c2ea286bf6..48e3e5e04f 100644
 +obj-$(CONFIG_$(SPL_)PINCTRL_HAILO15)	+= pinctrl-hailo15.o
 \ No newline at end of file
 -- 
-2.47.0
+2.47.1
 

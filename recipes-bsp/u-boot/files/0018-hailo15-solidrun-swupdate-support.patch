@@ -1,0 +1,60 @@
+From a2d7910f9a70e513f5e75db280d2cbeae89f9d87 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 8 Dec 2024 15:53:40 +0200
+Subject: [PATCH 18/20] hailo15-solidrun: swupdate support
+
+---
+ include/configs/hailo15-solidrun.h | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
+
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+index 7f19a45bf9..920c77b526 100644
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -21,6 +21,7 @@
+     /* Try all boot options by order */ \
+     "bootmenu_0=Boot from eMMC=run boot_mmc1\0" \
+     "bootmenu_1=Boot to flashing ramdisk=run boot_flashing_ramdisk\0" \
++    "bootmenu_2=SWUpdate=run boot_swupdate_mmc\0" \
+     "default_spl_boot_source=mmc2\0" \
+     "spl_boot_source=mmc2\0"
+ 
+@@ -50,27 +51,18 @@
+     "write_rootfs_to_mmc=setexpr rootfs_sdblock_count ${filesize} / ${sd_block_size} && setexpr rootfs_sdblock_count ${rootfs_sdblock_count} + 1; " UNNEEDED_MMCINFO_HACK " run get_rootfs_partition_start_offset && mmc write ${far_ram_addr} ${rootfs_partition_start_offset} ${rootfs_sdblock_count}\0" \
+     /* tftpboot sets filesize to the size it loaded */\
+     "download_wic_to_ram=wget ${far_ram_addr} ${serverip}/:core-image-minimal-" CONFIG_SYS_BOARD ".wic\0" \
+-    "download_rootfs_to_ram=wget ${far_ram_addr} ${serverip}/:core-image-minimal-" CONFIG_SYS_BOARD ".ext4\0" \
+-    "download_fitimage_to_ram=wget ${far_ram_addr} ${serverip}/:fitImage\0" \
+-    "download_uboot_to_ram=wget ${far_ram_addr} ${serverip}/:" CONFIG_SPL_FS_LOAD_PAYLOAD_NAME "\0" \
+     "boot_mmc=run bootargs_base bootargs_mmc && run load_fitimage_from_mmc && bootm ${far_ram_addr}${fit_image_conf}\0" \
+     "boot_mmc0=run set_mmc0_device_num && run boot_mmc\0"\
+     "boot_mmc1=run set_mmc1_device_num && run boot_mmc\0"\
+     "boot_flashing_ramdisk=run bootargs_base bootargs_mmc; wget ${far_ram_addr} ${serverip}/:${flashing_ramdisk_name}; bootm\0" \
+     "update_wic=run download_wic_to_ram && run write_wic_to_mmc\0" \
+-    "update_wic_mmc0=run set_mmc0_device_num && run update_wic\0" \
+     "update_wic_mmc1=run set_mmc1_device_num && run update_wic\0" \
+-    "update_rootfs=run download_rootfs_to_ram && run write_rootfs_to_mmc\0" \
+-    "update_fitimage=run download_fitimage_to_ram && run write_fitimage_to_mmc\0" \
+-    "update_uboot=run download_uboot_to_ram && run write_uboot_to_mmc\0" \
+-    "update_uboot_mmc0_mmc1=run download_uboot_to_ram && run write_uboot_to_mmc0_mmc1\0" \
+-    "update_partitions_mmc0=run set_mmc0_device_num && run update_partitions\0"\
+-    "update_partitions_mmc1=run set_mmc1_device_num && run update_partitions\0"\
+     "nfsroot=/mnt/hailo15_nfs/\0"\
+     "bootnfs=run download_fitimage_to_ram && run bootargs_base bootargs_nfs && bootm ${far_ram_addr}${fit_image_conf}\0" \
+     "auto_uboot_update=run update_uboot_mmc0_mmc1; env set auto_uboot_update_enable no && env set spl_boot_source ${default_spl_boot_source} && env set bootdelay ${default_bootdelay} && saveenv\0" \
+     "auto_uboot_update_enable=no\0" \
+     "default_bootdelay=2\0" \
++    SWUPDATE_EXTRA_ENV_SETTINGS \
+     BOOTMENU \
+     UPDATE_PARTITIONS_COMMAND
+ 
+@@ -105,4 +97,4 @@
+ 
+ #endif
+ 
+-#endif /* __HAILO15_SOLIDRUN_H */
+\ No newline at end of file
++#endif /* __HAILO15_SOLIDRUN_H */
+-- 
+2.47.1
+

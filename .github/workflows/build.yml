@@ -157,7 +157,7 @@ jobs:
             cp $BUILD_PATH/u-boot-tfa.itb deploy/
             cp $BUILD_PATH/hailo15_uart_recovery_fw.bin deploy/
             cp $BUILD_PATH/hailo-update-image-hailo15-solidrun.swu deploy/
-            cp $SDK_PATH/poky-glibc-x86_64-core-image-minimal-armv8a-hailo15-solidrun-toolchain-4.0.2.sh deploy/
+            cp $SDK_PATH/poky-glibc-x86_64-core-image-minimal-armv8a-hailo15-solidrun-toolchain-*.sh deploy/
             cp hailo15_board_tools*.whl deploy/
 
       - name: Deploy to the local minio storage

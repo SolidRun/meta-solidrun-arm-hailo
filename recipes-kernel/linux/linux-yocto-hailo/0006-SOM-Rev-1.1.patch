@@ -1,0 +1,425 @@
+From 2f8f6418be11d2fde043b7f247f39fc50b31e150 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 26 Jan 2025 14:26:31 +0000
+Subject: [PATCH] SOM Rev 1.1
+
+---
+ .../dts/hailo/hailo15-sr-som-pinctrl.dtsi     |  96 ++++++++++++
+ arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi | 142 +-----------------
+ .../boot/dts/hailo/hummingboard-iiot.dtsi     |  60 ++++----
+ 3 files changed, 136 insertions(+), 162 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
+
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
+new file mode 100644
+index 000000000000..1d20768e9fd3
+--- /dev/null
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
+@@ -0,0 +1,96 @@
++// SPDX-License-Identifier:     GPL-2.0
++/*
++ * Copyright (c) 2025 SolidRun Ltd.
++ */
++
++// /dts-v1/;
++
++#define GPIO_LINE_NAMES \
++    "GPIO0", "GPIO1", "GPIO2", "GPIO3", \
++    "GPIO4", "GPIO5", "GPIO6", "GPIO7", \
++    "UART2_RX", "UART2_TX", "GPIO10", "GPIO11", \
++    "UART3_RX", "UART3_TX", "GPIO14", "GPIO15", \
++    \
++    "GPIO16", "GPIO17", "GPIO18", "GPIO19", \
++    "GPIO20", "GPIO21", "I2C2_SDA", "I2C2_SCL", \
++    "GPIO24", "GPIO25", "GPIO26", "GPIO27", \
++    "GPIO28", "GPIO29", "UART0_CTS", "UART0_RTS"
++
++&pinctrl {
++    pinctrl_eth: eth {
++        pins = "eth_rgmii_tx_clk",
++               "eth_rgmii_tx_ctl",
++               "eth_rgmii_txd_0",
++               "eth_rgmii_txd_1",
++               "eth_rgmii_txd_2",
++               "eth_rgmii_txd_3";
++        drive-strength = <2>;
++    };
++
++    pinctrl_gpio6: gpio6 {
++        function = "gpio";
++        groups = "gpio6_grp";
++    };
++
++    pinctrl_usb_overcurrent_n_in: pinctrl_usb_overcurrent_n_in {
++        function = "usb_overcurrent_in";
++        groups = "usb_overcurrent_in_grp";
++        // status = "disabled";
++    };
++
++/* Pins 8-15, selected option 7 */
++
++    pinctrl_uart2: serial2 {
++        function = "uart2";
++        groups = "uart2_3_grp";
++    };
++
++    pinctrl_uart3: serial3 {
++        function = "uart3";
++        groups = "uart3_3_grp";
++    };
++
++    pinctrl_gpio14: gpio14 {
++        function = "gpio";
++        groups = "gpio14_grp";
++    };
++
++/* Pins 16-31, selected option 3 */
++
++    pinctrl_i2c2: i2c2 {
++        function = "i2c2";
++        groups = "i2c2_1_grp";
++    };
++
++    pinctrl_gpio27: gpio27 {
++        function = "gpio";
++        groups = "gpio27_grp";
++    };
++
++    pinctrl_gpio28: gpio28 {
++        function = "gpio";
++        groups = "gpio28_grp";
++    };
++
++    pinctrl_gpio29: gpio29 {
++        function = "gpio";
++        groups = "gpio29_grp";
++    };
++
++    pinctrl_uart0_cts_rts: uart0_cts_rts {
++        function = "uart0_cts_rts";
++        groups = "uart0_cts_rts_1_grp";
++    };
++
++};
++
++&gpio0 {
++    gpio-ranges = <&pinctrl 0 0 16>;
++    gpio-line-names = GPIO_LINE_NAMES;
++
++};
++
++&gpio1 {
++    gpio-ranges = <&pinctrl 0 16 16>;
++    gpio-line-names = GPIO_LINE_NAMES;
++};
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+index 5e56ae2066b8..de4374d0ac2c 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+@@ -7,7 +7,7 @@
+ 
+ #include <dt-bindings/net/mxl-8611x.h>
+ #include "hailo15-base.dtsi"
+-
++#include "hailo15-sr-som-pinctrl.dtsi"
+ / {
+     aliases {
+         ethernet0 = &eth;
+@@ -42,17 +42,6 @@ som_qspi_mux: som_qspi_mux {
+     };
+ };
+ 
+-&csi2rx0 {
+-    status = "okay";
+-    ports {
+-        port@0 {
+-            csi2rx_in_sensor: endpoint {
+-                remote-endpoint = <&sensor_out_csi2rx>;
+-            };
+-        };
+-    };
+-};
+-
+ &i2c_0 {
+     status = "okay";
+     gpio_pca: gpio@74 {
+@@ -64,7 +53,7 @@ gpio_pca: gpio@74 {
+         #gpio-cells = <2>;
+         interrupt-parent = <&gpio0>;
+         interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
+-        reset-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
++        reset-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+         gpio-controller;
+         gpio-line-names =
+         "pca_0_WL_REG_ON",
+@@ -85,24 +74,6 @@ gpio_pca: gpio@74 {
+         "pca_15";
+     };
+ 
+-    sensor_0: camera-sensor@1a {
+-        status = "okay";
+-        compatible = "sony,imx334", "sony,imx678";
+-        reg = <0x1a>;
+-        clocks = <&sensor_clk>;
+-        clock-names = "inclk";
+-        clock-frequency = <24000000>;
+-        csi-id = <0>;
+-        reset-gpios = <&gpio_pca 7 GPIO_ACTIVE_HIGH>;
+-        port {
+-            sensor_out_csi2rx: endpoint {
+-                data-lanes = <1 2 3 4>;
+-                remote-endpoint = <&csi2rx_in_sensor>;
+-                link-frequencies = /bits/ 64 <891000000 1440000000 1782000000>;
+-            };
+-        };
+-    };
+-
+     eeprom: eeprom@50 {
+         compatible = "atmel,24c02";
+         reg = <0x50>;
+@@ -155,51 +126,6 @@ MXL8611X_LEDX_CFG_LINK_UP_10MB_ON
+     };
+ };
+ 
+-&pinctrl {
+-    pinctrl_eth: eth {
+-        pins = "eth_rgmii_tx_clk",
+-               "eth_rgmii_tx_ctl",
+-               "eth_rgmii_txd_0",
+-               "eth_rgmii_txd_1",
+-               "eth_rgmii_txd_2",
+-               "eth_rgmii_txd_3";
+-        drive-strength = <2>;
+-    };
+-
+-    pinctrl_gpio6: gpio6 {
+-        function = "gpio";
+-        groups = "gpio6_grp";
+-    };
+-
+-    pinctrl_i2c2: i2c2 {
+-        function = "i2c2";
+-        groups = "i2c2_1_grp";
+-    };
+-
+-    pinctrl_uart0_cts_rts: uart0_cts_rts {
+-        function = "uart0_cts_rts";
+-        groups = "uart0_cts_rts_1_grp";
+-    };
+-
+-    pinctrl_usb_overcurrent_n_in: pinctrl_usb_overcurrent_n_in {
+-        function = "usb_overcurrent_in";
+-        groups = "usb_overcurrent_in_grp";
+-        status = "disabled";
+-    };
+-
+-    pinctrl_uart2: serial2 {
+-        function = "uart2";
+-        groups = "uart2_4_grp";
+-    };
+-
+-    // Conflict with USB overcurrent
+-    // pinctrl_uart3: serial3 {
+-    //     function = "uart3";
+-    //     groups = "uart3_3_grp";
+-    // };
+-
+-};
+-
+ &vision_subsys {
+     status = "okay";
+ };
+@@ -236,58 +162,6 @@ &xrp_reserved {
+     status = "okay";
+ };
+ 
+-&gpio0 {
+-    gpio-ranges = <&pinctrl 0 0 16>;
+-
+-    gpio-line-names =
+-        "gpio_in_out_0",
+-        "gpio_in_out_1",
+-        "DSI_RST",
+-        "CAM_TRIG",
+-        "M2_RST",
+-        "H_GPIO_5",
+-        "pca9539_int",
+-        "M2_W_RST",
+-        "pca9539_reset",
+-        "M2_WAKE_N",
+-        "M2_CD_N",
+-        "H_GPIO_11",
+-        "uart3_rxd_pad_in",
+-        "uart3_txd_pad_out",
+-        "H_GPIO_14",
+-        "H_GPIO_15";
+-
+-    pin_CAM_TRIG {
+-        gpio-hog;
+-        gpios = <3 GPIO_ACTIVE_HIGH>;
+-        output-low;
+-        line-name = "CAM_TRIG";
+-    };
+-};
+-
+-&gpio1 {
+-    gpio-ranges = <&pinctrl 0 16 16>;
+-
+-    gpio-line-names =
+-        "uart2_rxd_pad_in",
+-        "uart2_txd_pad_out",
+-        "H_GPIO_18",
+-        "H_GPIO_19",
+-        "H_GPIO_20",
+-        "H_GPIO_21",
+-        "i2c2_sda_in_out",
+-        "i2c2_scl_out",
+-        "H_GPIO_24",
+-        "H_GPIO_25",
+-        "H_GPIO_26",
+-        "H_GPIO_27",
+-        "uart2_cts_pad_in",
+-        "uart2_rts_pad_out",
+-        "uart0_cts_pad_in",
+-        "uart0_rts_pad_out";
+-};
+-
+-
+ &serial0 {
+     pinctrl-0 = <&pinctrl_uart0_cts_rts>;
+     pinctrl-names = "default";
+@@ -301,13 +175,13 @@ bluetooth: cyw {
+ 	};
+ };
+ 
+-&serial2 {
+-    // status = "okay";
+-    pinctrl-names = "default";
+-    pinctrl-0 = <&pinctrl_uart2>;
+-};
++// &serial2 {
++//     // status = "okay";
++//     pinctrl-names = "default";
++//     pinctrl-0 = <&pinctrl_uart2>;
++// };
+ 
+-// Conflict with USB overcurrent
++// // Conflict with USB overcurrent
+ // &serial3 {
+ //     status = "okay";
+ //     pinctrl-names = "default";
+diff --git a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+index e524c202744c..b3bc2d308f8d 100644
+--- a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
++++ b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+@@ -29,13 +29,6 @@ mipi_backlight: backlight {
+     };
+ };
+ 
+-&pinctrl {
+-    pinctrl_gpio25: gpio25_grp {
+-        function = "gpio";
+-        groups = "gpio25_grp";
+-    };
+-};
+-
+ &i2c_2 {
+     status = "okay";
+ 
+@@ -72,7 +65,7 @@ TCA_VIDEO_PWR_EN {
+ 
+     tca6416_21: gpio@21 {
+         pinctrl-names = "default";
+-        pinctrl-0 = <&pinctrl_gpio25>;
++        pinctrl-0 = <&pinctrl_gpio27>;
+ 
+         compatible = "nxp,pcal6416";
+         reg = <0x21>;
+@@ -81,7 +74,7 @@ tca6416_21: gpio@21 {
+         interrupt-controller;
+         #interrupt-cells = <2>;
+         interrupt-parent = <&gpio1>;
+-        interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
++        interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+         gpio-line-names =
+         "TCA_SPI_TPM/EXT",
+         "TCA_TPM_RST#",
+@@ -203,23 +196,23 @@ i2c_csi: i2c@1 {
+             #size-cells = <0>;
+             reg = <1>;
+ 
+-            // sensor_1: imx219@10 {
+-            //     compatible = "sony,imx219";
+-            //     reg = <0x10>;
+-            //     clocks = <&sensor_clk>;
+-            //     // VANA-supply = <&imx219_vana_2v8>;
+-            //     // VDIG-supply = <&imx219_vdig_1v8>;
+-            //     // VDDL-supply = <&imx219_vddl_1v2>;
+-
+-            //     port {
+-            //         imx219_0: endpoint {
+-            //             remote-endpoint = <&csi2_in>;
+-            //             clock-lanes = <0>;
+-            //             data-lanes = <1 2>;
+-            //             link-frequencies = /bits/ 64 <456000000>;
+-            //         };
+-            //     };
+-            // };
++            sensor_0: camera-sensor@1a {
++                status = "okay";
++                compatible = "sony,imx334", "sony,imx678";
++                reg = <0x1a>;
++                clocks = <&sensor_clk>;
++                clock-names = "inclk";
++                clock-frequency = <24000000>;
++                csi-id = <0>;
++                reset-gpios = <&gpio_dsi_expander 0 GPIO_ACTIVE_HIGH>;
++                port {
++                    sensor_out_csi2rx: endpoint {
++                        data-lanes = <1 2 3 4>;
++                        remote-endpoint = <&csi2rx_in_sensor>;
++                        link-frequencies = /bits/ 64 <891000000 1440000000 1782000000>;
++                    };
++                };
++            };
+         };
+ 
+         i2c_dsi: i2c@2 {
+@@ -234,14 +227,14 @@ gpio_dsi_expander: tca6408@21 {
+                 #gpio-cells = <2>;
+                 vcc-supply = <&lcd_i2c_rst>;
+                 gpio-line-names =
+-                "NC",
++                "CAM_RST#",
+                 "DSI_RESET",
+                 "DSI_STBYB",
+                 "DSI_PWM_BL",
+                 "DSI_L/R",
+                 "DSI_U/D",
+                 "DSI_CTP_/RST",
+-                "NC";
++                "CAM_TRIG";
+             };
+ 
+             touchscreen@41 {
+@@ -281,6 +274,17 @@ gpio_lvds_expander: tca6408@20 {
+     /* usb_hub: CYUSB3304@60 {}; */
+ };
+ 
++&csi2rx0 {
++    status = "okay";
++    ports {
++        port@0 {
++            csi2rx_in_sensor: endpoint {
++                remote-endpoint = <&sensor_out_csi2rx>;
++            };
++        };
++    };
++};
++
+ /* NOTE: Frequency can't go below 6250000 for hailo unit */
+ &hailo_spi_muxed {
+     /delete-node/ b2b_spi@1;
+-- 
+2.47.1
+

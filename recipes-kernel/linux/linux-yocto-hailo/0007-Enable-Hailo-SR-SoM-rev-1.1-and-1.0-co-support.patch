@@ -1,0 +1,214 @@
+From b3e003b03d4ff96f100ee622714510b63ce3534e Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 10 Feb 2025 09:30:15 +0000
+Subject: [PATCH] Enable Hailo SR SoM rev 1.1 and 1.0 co-support
+
+This commit drops support of the Hummingboard pro and enable support of
+the rev 1.0 as overlay for the rev 1.1/
+---
+ arch/arm64/boot/dts/hailo/Makefile            |  2 +-
+ .../dts/hailo/hailo15-solidrun-hb-pro.dts     | 14 -----
+ .../dts/hailo/hailo15-sr-som-pinctrl.dtsi     |  2 +-
+ .../dts/hailo/hailo15-sr-som-v1-overlay.dts   | 60 +++++++++++++++++++
+ arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi | 28 ++++-----
+ .../boot/dts/hailo/hummingboard-pro.dtsi      | 13 ----
+ 6 files changed, 76 insertions(+), 43 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/hailo/hailo15-solidrun-hb-pro.dts
+ create mode 100644 arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
+ delete mode 100644 arch/arm64/boot/dts/hailo/hummingboard-pro.dtsi
+
+diff --git a/arch/arm64/boot/dts/hailo/Makefile b/arch/arm64/boot/dts/hailo/Makefile
+index 05b611535b1c..083968f4c5c2 100644
+--- a/arch/arm64/boot/dts/hailo/Makefile
++++ b/arch/arm64/boot/dts/hailo/Makefile
+@@ -1,6 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ dtb-$(CONFIG_ARCH_HAILO15) += hailo15-solidrun.dtb
+-dtb-$(CONFIG_ARCH_HAILO15) += hailo15-solidrun-hb-pro.dtb
++dtb-$(CONFIG_ARCH_HAILO15) += hailo15-sr-som-v1-overlay.dtbo
+ dtb-$(CONFIG_ARCH_HAILO15) += hailo15-evb-2-camera-vpu.dtb
+ dtb-$(CONFIG_ARCH_HAILO15) += hailo15-evb-security-camera.dtb
+ dtb-$(CONFIG_ARCH_HAILO15) += hailo15-ginger-imaging-imx334.dtb
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-solidrun-hb-pro.dts b/arch/arm64/boot/dts/hailo/hailo15-solidrun-hb-pro.dts
+deleted file mode 100644
+index 51780d83a990..000000000000
+--- a/arch/arm64/boot/dts/hailo/hailo15-solidrun-hb-pro.dts
++++ /dev/null
+@@ -1,14 +0,0 @@
+-// SPDX-License-Identifier:     GPL-2.0
+-/*
+- * Copyright (c) 2024 SolidRun Ltd.
+- */
+-
+-/dts-v1/;
+-
+-#include "hailo15-sr-som.dtsi"
+-#include "hummingboard-pro.dtsi"
+-
+-/ {
+-    model = "SolidRun HummingBoard Pro";
+-    compatible = "hailo,hailo15", "solidrun,hummingboard_pro";
+-};
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
+index 1d20768e9fd3..c3a3c17d8b42 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
+@@ -35,7 +35,7 @@ pinctrl_gpio6: gpio6 {
+     pinctrl_usb_overcurrent_n_in: pinctrl_usb_overcurrent_n_in {
+         function = "usb_overcurrent_in";
+         groups = "usb_overcurrent_in_grp";
+-        // status = "disabled";
++        status = "disabled";
+     };
+ 
+ /* Pins 8-15, selected option 7 */
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts b/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
+new file mode 100644
+index 000000000000..034371409f7e
+--- /dev/null
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
+@@ -0,0 +1,60 @@
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++    /* 1. Modify the pca node reset-gpios property */
++    fragment@0 {
++        target = <&gpio_pca>;
++        __overlay__ {
++            reset-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
++        };
++    };
++
++    /* 2. Add a new child node to i2c_0: sensor_i2c00 */
++    fragment@1 {
++        target = <&i2c_0>;
++        __overlay__ {
++            sensor_i2c0: camera-sensor-i2c0@1a {
++                status = "okay";
++                compatible = "sony,imx334", "sony,imx678";
++                reg = <0x1a>;
++                clocks = <&sensor_clk>;
++                clock-names = "inclk";
++                clock-frequency = <24000000>;
++                csi-id = <0>;
++                reset-gpios = <&gpio_pca 7 GPIO_ACTIVE_HIGH>;
++                port {
++                    sensor_out_csi2rx_i2c0: endpoint {
++                        data-lanes = <1 2 3 4>;
++                        remote-endpoint = <&csi2rx_in_sensor>;
++                        link-frequencies = /bits/ 64 <891000000 1440000000 1782000000>;
++                    };
++                };
++            };
++        };
++    };
++
++    /* 3. Update the remote-endpoint in csi2rx0 to point to sensor_out_csi2rx_i2c0 */
++    fragment@2 {
++        target = <&csi2rx0>;
++        __overlay__ {
++            ports {
++                port@0 {
++                    csi2rx_in_sensor: endpoint {
++                        remote-endpoint = <&sensor_out_csi2rx_i2c0>;
++                    };
++                };
++            };
++        };
++    };
++
++    /* 4. Disable the sensor_0 node */
++    fragment@3 {
++        target = <&sensor_0>;
++        __overlay__ {
++            status = "disabled";
++        };
++    };
++};
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+index de4374d0ac2c..e238e6b4c1bc 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+@@ -47,7 +47,7 @@ &i2c_0 {
+     gpio_pca: gpio@74 {
+         pinctrl-names = "default";
+         pinctrl-0 = <&pinctrl_gpio6>;
+-        
++
+         compatible = "nxp,pca9539";
+         reg = <0x74>;
+         #gpio-cells = <2>;
+@@ -95,6 +95,7 @@ &sdio1 {
+     non-removable;
+     bus-width = <4>;
+     /delete-property/ cap-mmc-hw-reset;
++    mmc-hs200-1_8v;
+ 
+     phy-config {
+         card-is-emmc = <0x1>;
+@@ -175,18 +176,18 @@ bluetooth: cyw {
+ 	};
+ };
+ 
+-// &serial2 {
+-//     // status = "okay";
+-//     pinctrl-names = "default";
+-//     pinctrl-0 = <&pinctrl_uart2>;
+-// };
++&serial2 {
++    // status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_uart2>;
++};
+ 
+-// // Conflict with USB overcurrent
+-// &serial3 {
+-//     status = "okay";
+-//     pinctrl-names = "default";
+-//     pinctrl-0 = <&pinctrl_uart3>;
+-// };
++// Conflict with USB overcurrent
++&serial3 {
++    // status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_uart3>;
++};
+ 
+ &sdio0 {
+     status = "okay";
+@@ -274,9 +275,8 @@ b2b_spi: b2b_spi@1 {
+             status = "disabled";
+             compatible = "hailo,hailo-spi-slave-test";
+             reg = <1>;
+-            spi-max-frequency = <1000000>;
++            spi-max-frequency = <6250000>;
+             hailo,non-flash-device;
+         };
+     };
+ };
+-
+diff --git a/arch/arm64/boot/dts/hailo/hummingboard-pro.dtsi b/arch/arm64/boot/dts/hailo/hummingboard-pro.dtsi
+deleted file mode 100644
+index b55fcf8cd0cd..000000000000
+--- a/arch/arm64/boot/dts/hailo/hummingboard-pro.dtsi
++++ /dev/null
+@@ -1,13 +0,0 @@
+-// SPDX-License-Identifier:     GPL-2.0
+-/*
+- * Copyright (c) 2024 SolidRun Ltd.
+- */
+- 
+-
+-&eth {
+-    status = "okay";
+-};
+-
+-&b2b_spi {
+-    status = "okay";
+-};
+-- 
+2.47.1
+

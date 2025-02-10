@@ -1,0 +1,25 @@
+From 2429193a83e7a98960d2d717f797672ac1067070 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 26 Jan 2025 14:30:00 +0000
+Subject: [PATCH] Set machine name in the u-boot env
+
+---
+ include/configs/hailo15-solidrun.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+index 920c77b526..24950afc2d 100644
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -34,6 +34,8 @@
+     "bootargs_nfs=setenv bootargs ${bootargs} root=/dev/nfs rootfstype=nfs ip=${ipaddr} nfsroot=${serverip}:${nfsroot},v3,tcp\0" \
+     "ramdisk_size=0x8000000\0" \
+     "far_ram_addr=0x85000000\0" \
++    "core_image_name=" CONFIG_CORE_IMAGE_NAME "\0" \
++    "machine_name=" CONFIG_SYS_BOARD "\0" \
+     "get_rootfs_partition_start_offset=part start mmc ${device_num} ${mmc_rootfs_partition} rootfs_partition_start_offset\0" \
+     "sd_block_size=200\0" /* in hex, taken from running mmcinfo */\
+     "serverip=10.0.0.2\0" \
+-- 
+2.47.1
+

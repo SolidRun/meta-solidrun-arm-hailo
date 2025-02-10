@@ -1,0 +1,34 @@
+From 27d1466ecdcbb08291d44245e5f1870cf898907d Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 25 Nov 2024 15:49:00 +0200
+Subject: [PATCH 16/20] SR SOM: SPL: Schange fallback do mmc2 and uart
+
+---
+ board/hailo/common/hailo15_spl.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/board/hailo/common/hailo15_spl.c b/board/hailo/common/hailo15_spl.c
+index 619cf335fb..e8caff973c 100644
+--- a/board/hailo/common/hailo15_spl.c
++++ b/board/hailo/common/hailo15_spl.c
+@@ -102,10 +102,17 @@ void board_boot_order(u32 *spl_boot_list)
+ 	} else if (!strcmp(s, "nor")) {
+ 		spl_boot_list[0] = BOOT_DEVICE_NOR;
+ 	} else {
++#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
++		printf("spl_boot_source=%s unsupported, falling back to mmc2\n", s);
++		s = "mmc2";
++		spl_boot_list[0] = BOOT_DEVICE_MMC2;
++		spl_boot_list[1] = BOOT_DEVICE_UART;
++#else
+ 		printf("spl_boot_source=%s unsupported, falling back to mmc12\n", s);
+ 		s = "mmc12";
+ 		spl_boot_list[0] = BOOT_DEVICE_MMC1;
+ 		spl_boot_list[1] = BOOT_DEVICE_MMC2;
++#endif
+ 	}
+ 
+ 	printf("U-Boot SPL boot source %s\n", s);
+-- 
+2.47.1
+

@@ -1,0 +1,219 @@
+From b21e9dc6d2eaecccf7140c8ce3a399d59b5822c4 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Sun, 8 Dec 2024 15:53:17 +0200
+Subject: [PATCH 17/20] hailo15-solidrun: option to force uart boot with gpio
+
+---
+ arch/arm/dts/hailo15-solidrun.dts  | 87 ++++++++++++++++++------------
+ board/hailo/common/hailo15_spl.c   | 37 ++++++++++++-
+ configs/hailo15_solidrun_defconfig |  8 +++
+ 3 files changed, 97 insertions(+), 35 deletions(-)
+
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+index 1e7deb6615..e1a695b077 100644
+--- a/arch/arm/dts/hailo15-solidrun.dts
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -25,6 +25,21 @@
+ //     uart-0-reverse-cts;
+ // };
+ 
++&gpio0 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_gpio1>;
++    u-boot,dm-pre-reloc;
++    u-boot,dm-spl;
++
++    boot_conf_hog: boot_conf_hog {
++		gpio-hog;
++		gpios = <1 GPIO_ACTIVE_HIGH>;
++		input;
++		line-name = "boot_conf_hog";
++        u-boot,dm-spl;
++        u-boot,dm-pre-reloc;
++    };
++};
+ 
+ /* SDIO0 should be enabled in u-boot in order to work in Linux  */
+ &sdio0 {
+@@ -87,6 +102,10 @@
+         groups = "i2c2_1_grp";
+     };
+ 
++    pinctrl_gpio1: gpio1 {
++        function = "gpio";
++        groups = "gpio1_grp";
++    };
+ };
+ 
+ &i2c_0 {
+@@ -97,40 +116,40 @@
+ 		reg = <0x50>;
+ 	};
+ 
+-    pca9539: pca9539@74 {
+-		compatible = "nxp,pca9539";
+-		reg = <0x74>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-        reset-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+-        gpio-line-names =
+-        "pca_0_WL_REG_ON",
+-        "pca_1_BT_REG_ON",
+-        "pca_2_ETH_RST",
+-        "pca_3_ENET_nINT",
+-        "pca_4",
+-        "pca_8_H_PCIE_PERST_N",
+-        "pca_9_H_PCIE_CLKREQ_N",
+-        "pca_10_H_PCIE_WAKE_N",
+-        "pca_11_PCIE_nCLK_N",
+-        "pca_12",
+-        "pca_13",
+-        "pca_14",
+-        "pca_15";
+-
+-        WIFI_HOG {
+-			gpio-hog;
+-			gpios = <0 GPIO_ACTIVE_HIGH>;
+-			output-low;
+-			line-name = "WL_REG_ON";
+-		};
+-        BT_HOG {
+-			gpio-hog;
+-			gpios = <1 GPIO_ACTIVE_HIGH>;
+-			output-low;
+-			line-name = "WL_REG_ON";
+-		};
+-    };
++    // pca9539: pca9539@74 {
++	// 	compatible = "nxp,pca9539";
++	// 	reg = <0x74>;
++	// 	gpio-controller;
++	// 	#gpio-cells = <2>;
++    //     reset-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
++    //     gpio-line-names =
++    //     "pca_0_WL_REG_ON",
++    //     "pca_1_BT_REG_ON",
++    //     "pca_2_ETH_RST",
++    //     "pca_3_ENET_nINT",
++    //     "pca_4",
++    //     "pca_8_H_PCIE_PERST_N",
++    //     "pca_9_H_PCIE_CLKREQ_N",
++    //     "pca_10_H_PCIE_WAKE_N",
++    //     "pca_11_PCIE_nCLK_N",
++    //     "pca_12",
++    //     "pca_13",
++    //     "pca_14",
++    //     "pca_15";
++
++    //     WIFI_HOG {
++	// 		gpio-hog;
++	// 		gpios = <0 GPIO_ACTIVE_HIGH>;
++	// 		output-low;
++	// 		line-name = "WL_REG_ON";
++	// 	};
++    //     BT_HOG {
++	// 		gpio-hog;
++	// 		gpios = <1 GPIO_ACTIVE_HIGH>;
++	// 		output-low;
++	// 		line-name = "WL_REG_ON";
++	// 	};
++    // };
+ };
+ 
+ &i2c_2 {
+diff --git a/board/hailo/common/hailo15_spl.c b/board/hailo/common/hailo15_spl.c
+index e8caff973c..22561ed4a6 100644
+--- a/board/hailo/common/hailo15_spl.c
++++ b/board/hailo/common/hailo15_spl.c
+@@ -10,6 +10,7 @@
+ #include <init.h>
+ #include <cpu_func.h>
+ #include "hailo15_board.h"
++#include <asm/gpio.h>
+ #ifdef CONFIG_SPL_ENV_IS_IN_MMC
+ #include "mmc.h"
+ #endif
+@@ -18,6 +19,24 @@
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
++int spl_check_boot_gpio1(void)
++{
++	struct gpio_desc *gpio;
++	int ret;
++	ret = gpio_hog_lookup_name("boot_conf_hog", &gpio);
++	if (ret) {
++		printf("%s: gpio_hog_lookup_name returned %d\n", __func__, ret);
++		return ret;
++	}
++
++	ret = dm_gpio_get_value(gpio);
++	if (ret < 0)
++	{
++		printf("%s: Failed to get spl_boot_config_gpio: %d\n", __func__, ret);
++	}
++	return ret;
++}
++
+ void board_init_f(ulong dummy)
+ {
+ 	/* we enable MMU + caching before doing anything else to improve performace */
+@@ -65,14 +84,31 @@ void board_boot_order(u32 *spl_boot_list)
+ {
+ 	const char *s;
+ 
++#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
++	int boot_gpio;
++	boot_gpio = spl_check_boot_gpio1();
++#endif
++
+ 	env_init();
+ 	env_load();
+ 
+ 	s = env_get("spl_boot_source");
++#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
++	if (!s) {
++		puts("failed to get 'spl_boot_source' from env, falling back to mmc2\n");
++		s = "mmc2";
++	}
++	if (boot_gpio == 1)
++	{
++		puts("Boot source is forced to uart with DIP switch\n");
++		s = "uart";
++	} 
++#else
+ 	if (!s) {
+ 		puts("failed to get 'spl_boot_source' from env, falling back to mmc12\n");
+ 		s = "mmc12";
+ 	}
++#endif
+ 
+ 	if (!strcmp(s, "mmc1")) {
+ 		spl_boot_list[0] = BOOT_DEVICE_MMC1;
+@@ -114,7 +150,6 @@ void board_boot_order(u32 *spl_boot_list)
+ 		spl_boot_list[1] = BOOT_DEVICE_MMC2;
+ #endif
+ 	}
+-
+ 	printf("U-Boot SPL boot source %s\n", s);
+ }
+ 
+diff --git a/configs/hailo15_solidrun_defconfig b/configs/hailo15_solidrun_defconfig
+index b02099a571..aebfe8f573 100644
+--- a/configs/hailo15_solidrun_defconfig
++++ b/configs/hailo15_solidrun_defconfig
+@@ -28,3 +28,11 @@ CONFIG_CMD_WGET=y
+ 
+ CONFIG_CMD_ERASEENV=y
+ CONFIG_BOARD_LATE_INIT=y
++
++CONFIG_SPL_PINCTRL=y
++CONFIG_SPL_PINCTRL_HAILO15=y
++CONFIG_SPL_GPIO=y
++CONFIG_SPL_CMSDK_GPIO=y
++CONFIG_SPL_DM_GPIO=y
++CONFIG_SPL_DM_GPIO_LOOKUP_LABEL=y
++CONFIG_SPL_GPIO_HOG=y
+-- 
+2.47.1
+

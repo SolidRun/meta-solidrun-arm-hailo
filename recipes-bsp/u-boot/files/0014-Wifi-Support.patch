@@ -1,0 +1,44 @@
+From 77740ea542442b030a9065877ec576cda1d2c4c4 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 12 Aug 2024 14:52:30 +0300
+Subject: [PATCH 14/20] Wifi Support
+
+---
+ arch/arm/dts/hailo15-solidrun.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+index 0823ee0180..1e7deb6615 100644
+--- a/arch/arm/dts/hailo15-solidrun.dts
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -20,6 +20,27 @@
+ };
+ 
+ 
++// &hailo_boot_info {
++//     uart-0-reverse-rts;
++//     uart-0-reverse-cts;
++// };
++
++
++/* SDIO0 should be enabled in u-boot in order to work in Linux  */
++&sdio0 {
++    status = "okay";
++    non-removable;
++    phy-config {
++        card-is-emmc = <0x1>;
++        cmd-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        dat-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        rst-pad-values = <0x2 0x2 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        clk-pad-values = <0x2 0x2 0x0 0x0>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
++        sdclkdl-cnfg = <0x0 0x32>; //extdly_en, cckdl_dc
++        drive-strength = <0xC 0xC>; //pad_sp, pad_sn
++    };
++};
++
+ &sdio1 {
+     status = "okay";
+     non-removable;
+-- 
+2.47.1
+

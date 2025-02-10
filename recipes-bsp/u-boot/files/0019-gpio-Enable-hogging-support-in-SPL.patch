@@ -1,7 +1,7 @@
-From 8f51215005172f19785083398ccb1dbf4be763c9 Mon Sep 17 00:00:00 2001
+From 15a8913766b37813d75b55f07c1e548c94bb7125 Mon Sep 17 00:00:00 2001
 From: Mikhail Anikin <mikhail.anikin@solid-run.com>
 Date: Sun, 8 Dec 2024 15:46:06 +0200
-Subject: [PATCH 1/4] gpio: Enable hogging support in SPL
+Subject: [PATCH 19/20] gpio: Enable hogging support in SPL
 
 Use the CONFIG macros to conditionally build the GPIO hogging support in
 either the SPL or U-Boot, or both, depending on the configuration. Also
@@ -17,7 +17,7 @@ Reviewed-by: Simon Glass <sjg@chromium.org>
  3 files changed, 23 insertions(+), 4 deletions(-)
 
 diff --git a/common/spl/spl.c b/common/spl/spl.c
-index 4c101ec5d3..b5cc9ac90b 100644
+index 57a9cf53be..c8f92b4967 100644
 --- a/common/spl/spl.c
 +++ b/common/spl/spl.c
 @@ -20,6 +20,7 @@
@@ -28,7 +28,7 @@ index 4c101ec5d3..b5cc9ac90b 100644
  #include <asm/u-boot.h>
  #include <nand.h>
  #include <fat.h>
-@@ -723,6 +724,9 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
+@@ -725,6 +726,9 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
  		}
  	}
  
@@ -98,5 +98,5 @@ index 1c5e2e7976..dd6aceb8b3 100644
  			if (ofnode_read_bool(node, "gpio-hog")) {
  				const char *name = ofnode_get_name(node);
 -- 
-2.47.0
+2.47.1
 
