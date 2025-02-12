@@ -62,6 +62,7 @@ jobs:
         options: --user "${{ needs.prepare_container.outputs.uid }}:${{ needs.prepare_container.outputs.gid }}"
     outputs: 
       build_tag: ${{ steps.tag_step.outputs.build_tag }}
+    timeout-minutes: 480
     steps:
       - name: Checkout repo 
         uses: actions/checkout@v4
