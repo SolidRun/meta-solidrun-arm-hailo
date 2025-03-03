@@ -85,6 +85,13 @@ jobs:
         run: |
           kas checkout meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
 
+      - name: Checkout repo 
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_SECRET_KEY }}
+          repository: ${{ secrets.CERT_REPO }}
+          path: meta-solidrun-arm-hailo/recipes-bsp/hailo-secureboot-assets
+
       - name: Create cache dir
         run: mkdir -p buildcache
 
