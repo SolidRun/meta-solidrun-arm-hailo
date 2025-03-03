@@ -85,6 +85,16 @@ jobs:
         run: |
           kas checkout meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
 
+      - name: Checkout assets
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_SECRET_KEY }}
+          repository: ${{ secrets.CERT_REPO }}
+          path: hailo-secureboot-assets
+
+      - name: Copy assets
+        run: cp -r hailo-secureboot-assets/* meta-solidrun-arm-hailo/recipes-bsp/
+
       - name: Create cache dir
         run: mkdir -p buildcache
 
