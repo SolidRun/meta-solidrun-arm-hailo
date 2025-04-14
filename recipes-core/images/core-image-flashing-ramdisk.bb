@@ -10,6 +10,7 @@ EXTRA_IMAGEDEPENDS:remove = "u-boot-tfa-image"
 IMAGE_INSTALL = "packagegroup-core-boot \
                 packagegroup-base-extended \
                 packagegroup-hailo-flashing-ramdisk \
+                kernel-modules \
 "
 
 inherit image

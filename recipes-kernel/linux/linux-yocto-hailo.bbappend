@@ -9,6 +9,7 @@ SRC_URI:append = " \
     file://0005-input-touchscreen-ilitek-Use-gpiod_set_value_canslee.patch \
     file://0006-SOM-Rev-1.1.patch \
     file://0007-Enable-Hailo-SR-SoM-rev-1.1-and-1.0-co-support.patch \
+    file://0008-Enable-uarts-2-and-3-with-USB.patch \
 "
 
 # defconfig

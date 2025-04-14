@@ -1,0 +1,186 @@
+From 7a818a27b5e0565bfd7cb11fec33564628fd4685 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Thu, 10 Apr 2025 10:34:44 +0000
+Subject: [PATCH] Enable uarts 2 and 3 with USB
+
+---
+ .../dts/hailo/hailo15-sr-som-pinctrl.dtsi     | 27 ++++++++++++++-----
+ .../dts/hailo/hailo15-sr-som-v1-overlay.dts   | 17 +++++++++++-
+ arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi | 11 ++++----
+ .../boot/dts/hailo/hummingboard-iiot.dtsi     | 20 +++++++-------
+ 4 files changed, 52 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
+index c3a3c17d8b42..c8fa6b359876 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som-pinctrl.dtsi
+@@ -32,12 +32,6 @@ pinctrl_gpio6: gpio6 {
+         groups = "gpio6_grp";
+     };
+ 
+-    pinctrl_usb_overcurrent_n_in: pinctrl_usb_overcurrent_n_in {
+-        function = "usb_overcurrent_in";
+-        groups = "usb_overcurrent_in_grp";
+-        status = "disabled";
+-    };
+-
+ /* Pins 8-15, selected option 7 */
+ 
+     pinctrl_uart2: serial2 {
+@@ -62,6 +56,26 @@ pinctrl_i2c2: i2c2 {
+         groups = "i2c2_1_grp";
+     };
+ 
++    pinctrl_gpio16: gpio16 {
++        function = "gpio";
++        groups = "gpio16_grp";
++    };
++
++    pinctrl_gpio17: gpio17 {
++        function = "gpio";
++        groups = "gpio17_grp";
++    };
++
++    pinctrl_gpio20: gpio20 {
++        function = "gpio";
++        groups = "gpio20_grp";
++    };
++
++    pinctrl_gpio21: gpio21 {
++        function = "gpio";
++        groups = "gpio21_grp";
++    };
++
+     pinctrl_gpio27: gpio27 {
+         function = "gpio";
+         groups = "gpio27_grp";
+@@ -87,7 +101,6 @@ pinctrl_uart0_cts_rts: uart0_cts_rts {
+ &gpio0 {
+     gpio-ranges = <&pinctrl 0 0 16>;
+     gpio-line-names = GPIO_LINE_NAMES;
+-
+ };
+ 
+ &gpio1 {
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts b/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
+index 034371409f7e..7dce65befbf2 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
+@@ -12,7 +12,7 @@ __overlay__ {
+         };
+     };
+ 
+-    /* 2. Add a new child node to i2c_0: sensor_i2c00 */
++    /* 2. Add a new child node to i2c_0: sensor_i2c0 */
+     fragment@1 {
+         target = <&i2c_0>;
+         __overlay__ {
+@@ -57,4 +57,19 @@ __overlay__ {
+             status = "disabled";
+         };
+     };
++
++    /* 4. Disable serial 2 and 3 (conflict with GPIO8) */
++    fragment@4 {
++        target = <&serial2>;
++        __overlay__ {
++            status = "disabled";
++        };
++    };
++
++    fragment@5 {
++        target = <&serial3>;
++        __overlay__ {
++            status = "disabled";
++        };
++    };
+ };
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+index e238e6b4c1bc..a32c0add2f84 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som.dtsi
+@@ -177,14 +177,13 @@ bluetooth: cyw {
+ };
+ 
+ &serial2 {
+-    // status = "okay";
++    status = "okay";
+     pinctrl-names = "default";
+     pinctrl-0 = <&pinctrl_uart2>;
+ };
+ 
+-// Conflict with USB overcurrent
+ &serial3 {
+-    // status = "okay";
++    status = "okay";
+     pinctrl-names = "default";
+     pinctrl-0 = <&pinctrl_uart3>;
+ };
+@@ -243,11 +242,13 @@ &cdns_usb3 {
+     dr_mode = "host";
+     phys = <&torrent_phy_usb3>;
+     phy-names = "cdns3,usb3-phy";
++};
++
++&hailo_usb3 {
+     disconnected-overcurrent;
+-    pinctrl-names = "default";
+-    pinctrl-0 = <&pinctrl_usb_overcurrent_n_in>;
+ };
+ 
++
+ /* NOTE: Frequency can't go below 6250000 for the Cadence QSPI IP */
+ &qspi {
+     status = "okay";
+diff --git a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+index b3bc2d308f8d..84314da95c2c 100644
+--- a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
++++ b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+@@ -13,14 +13,14 @@ carrier_spi_mux: carrier_spi_mux {
+         idle-state = <0>;
+     };
+ 
+-    lcd_i2c_rst: lcd_i2c_rst {
+-        compatible = "regulator-fixed";
+-        regulator-name = "lcd_i2c_rst";
+-        regulator-min-microvolt = <1800000>;
+-        regulator-max-microvolt = <1800000>;
+-        gpio = <&tca6416_21 4 GPIO_ACTIVE_HIGH>;
+-        enable-active-high;
+-    };
++    // lcd_i2c_rst: lcd_i2c_rst {
++    //     compatible = "regulator-fixed";
++    //     regulator-name = "lcd_i2c_rst";
++    //     regulator-min-microvolt = <1800000>;
++    //     regulator-max-microvolt = <1800000>;
++    //     gpio = <&tca6416_21 4 GPIO_ACTIVE_HIGH>;
++    //     enable-active-high;
++    // };
+ 
+     mipi_backlight: backlight {
+         compatible = "gpio-backlight";
+@@ -225,7 +225,7 @@ gpio_dsi_expander: tca6408@21 {
+                 reg = <0x21>;
+                 gpio-controller;
+                 #gpio-cells = <2>;
+-                vcc-supply = <&lcd_i2c_rst>;
++                reset-gpios = <&tca6416_21 4 GPIO_ACTIVE_LOW>;
+                 gpio-line-names =
+                 "CAM_RST#",
+                 "DSI_RESET",
+@@ -253,11 +253,11 @@ i2c_lvds: i2c@3 {
+             reg = <3>;
+ 
+             gpio_lvds_expander: tca6408@20 {
++                status = "disabled";
+                 compatible = "ti,tca6408";
+                 reg = <0x20>;
+                 gpio-controller;
+                 #gpio-cells = <2>;
+-                vcc-supply = <&lcd_i2c_rst>;
+                 gpio-line-names =
+                 "SELB",
+                 "LVDS_RESET",
+-- 
+2.47.1
+
