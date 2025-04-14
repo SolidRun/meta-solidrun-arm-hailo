@@ -1,0 +1,41 @@
+From 992c0ae7f623bd6edf3da2e66921b5f8c09c4c5c Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 7 Apr 2025 07:09:42 +0000
+Subject: [PATCH 2/2] Remove gpio8 from u-boot (pinctr conflict with rev 1.1)
+
+---
+ arch/arm/dts/hailo15-solidrun.dts | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
+
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+index b35eb9cd4f..022ca7f67d 100644
+--- a/arch/arm/dts/hailo15-solidrun.dts
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -21,7 +21,7 @@
+ 
+ &gpio0 {
+     pinctrl-names = "default";
+-    pinctrl-0 = <&pinctrl_gpio1>, <&pinctrl_gpio8>, <&pinctrl_gpio14>;
++    pinctrl-0 = <&pinctrl_gpio1>, <&pinctrl_gpio14>;
+     u-boot,dm-pre-reloc;
+     u-boot,dm-spl;
+ 
+@@ -34,15 +34,6 @@
+         u-boot,dm-pre-reloc;
+     };
+ 
+-    pca953x_reset_v1: pca953x_reset_v1 {
+-		gpio-hog;
+-		gpios = <8 GPIO_ACTIVE_HIGH>;
+-		output-high;
+-		line-name = "pca953x_reset_v1";
+-        u-boot,dm-spl;
+-        u-boot,dm-pre-reloc;
+-    };
+-
+     pca953x_reset: pca953x_reset {
+ 		gpio-hog;
+ 		gpios = <14 GPIO_ACTIVE_HIGH>;
+-- 
+2.47.1
+

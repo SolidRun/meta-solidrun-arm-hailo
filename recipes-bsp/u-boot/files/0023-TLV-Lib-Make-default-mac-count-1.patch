@@ -1,0 +1,25 @@
+From fcffdffaebddc8b1f4de2e3b07726c6c15948d83 Mon Sep 17 00:00:00 2001
+From: Mikhail Anikin <mikhail.anikin@solid-run.com>
+Date: Mon, 7 Apr 2025 07:09:02 +0000
+Subject: [PATCH 1/2] [TLV Lib] Make default mac count 1
+
+---
+ cmd/tlv_eeprom.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cmd/tlv_eeprom.c b/cmd/tlv_eeprom.c
+index 444ddc60ed..82c1c1181e 100644
+--- a/cmd/tlv_eeprom.c
++++ b/cmd/tlv_eeprom.c
+@@ -729,7 +729,7 @@ int mac_read_from_eeprom(void)
+ 	}
+ 	eeprom_hdr = tlv_header_get(tlv);
+ 
+-	maccount = 0;
++	maccount = 1;
+ 	eeprom_tlv = tlv_entry_next_by_code(tlv, NULL, TLV_CODE_MAC_SIZE);
+ 	if (!IS_ERR(eeprom_tlv))
+ 		tlv_entry_get_uint16(eeprom_tlv, &maccount);
+-- 
+2.47.1
+

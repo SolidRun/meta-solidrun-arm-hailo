@@ -23,4 +23,6 @@ SRC_URI:append = " \
     file://0020-hailo15-gpio-support-for-SPL.patch \
     file://0021-Set-machine-name-in-the-u-boot-env.patch \
     file://0022-Enable-SOM-rev-1.0-and-1.1-cosupport-for-a-single-u-.patch \
+    file://0023-TLV-Lib-Make-default-mac-count-1.patch \
+    file://0024-Remove-gpio8-from-u-boot-pinctr-conflict-with-rev-1.patch \
 "

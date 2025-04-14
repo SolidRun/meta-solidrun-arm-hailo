@@ -1,0 +1,23 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          connman_static_ip
+# Required-Start:    connman
+# Default-Start:     S
+# Short-Description: Generate static IP ConnMan settings and disable self
+### END INIT INFO
+
+case "$1" in
+  start)
+    echo "Running ConnMan static IP settings setup..."
+    /usr/libexec/connman-static-ip-init.sh
+    ;;
+  stop|restart)
+    ;;
+  *)
+    echo "Usage: $0 {start}"
+    exit 1
+    ;;
+esac
+
+exit 0
