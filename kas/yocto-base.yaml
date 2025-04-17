@@ -5,36 +5,36 @@ distro: poky
 repos:
   meta-openembedded:
     url: "https://git.openembedded.org/meta-openembedded"
-    commit: 4ad41baed6236d499804cbfc4f174042d84fce97
+    refspec: 4ad41baed6236d499804cbfc4f174042d84fce97
     layers:
       meta-filesystems:
       meta-networking:
       meta-oe:
       meta-python:
+      meta-perl:
       meta-multimedia:
 
   poky:
     url: "https://git.yoctoproject.org/poky"
-    commit: 8e092852b63e998d990b8f8e1aa91297dec4430f
+    refspec: 8e092852b63e998d990b8f8e1aa91297dec4430f
     layers:
       meta:
       meta-poky:
       meta-yocto-bsp:
 
-  meta-swupdate:
-    url: "https://github.com/sbabic/meta-swupdate.git"
-    commit: 6918be849ddf1fed5b7a0173e51c7a136e8d4101
+  meta-qt5:
+    url: "https://github.com/meta-qt5/meta-qt5.git"
+    refspec: kirkstone
     layers:
       .:
+
+  meta-swupdate:
+    url: "https://github.com/sbabic/meta-swupdate.git"
+    refspec: 6918be849ddf1fed5b7a0173e51c7a136e8d4101
+
   meta-arm:
     url: "https://git.yoctoproject.org/meta-arm"
-    commit: bf98ef902e6e7042e46a69fb2df6c68d00de2764
+    refspec: bf98ef902e6e7042e46a69fb2df6c68d00de2764
     layers:
       meta-arm-toolchain:
       meta-arm:
-
-  meta-qt5:
-    url: "https://github.com/meta-qt5/meta-qt5.git"
-    commit: kirkstone
-    layers:
-      .:
