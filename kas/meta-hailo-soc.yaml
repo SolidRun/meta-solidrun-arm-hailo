@@ -4,7 +4,7 @@ header:
 repos:
   meta-hailo-soc:
     url: https://github.com/hailo-ai/meta-hailo-soc/
-    commit: 0b8779e5bf9770a24578efe75ee5918bc1df8b00
+    commit: dfbb55461fe16cae58a27105d69026a9bd57181e
     layers:
       meta-hailo-bsp-examples:
       meta-hailo-bsp:
