@@ -15,7 +15,7 @@ repos:
       meta-multimedia:
 
   poky:
-    url: "https://git.yoctoproject.org/poky"
+    url: "https://github.com/yoctoproject/poky"
     refspec: 8e092852b63e998d990b8f8e1aa91297dec4430f
     layers:
       meta:

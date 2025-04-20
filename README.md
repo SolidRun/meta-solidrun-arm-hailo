@@ -69,6 +69,22 @@ docker run -it -u "$(id -u):$(id -g)" -v ${PWD}:/work --workdir=/work build_hail
 Output artifacts are located in the  
 `build/tmp/deploy/images/hailo15-solidrun`
 
+## Using the Package Manager
+
+The demo image includes the `opkg` package manager. It is intended for installing lightweight tools and dependencies during development and evaluation.
+
+**Note:** Using the package manager in production is not recommended.  
+The package mirror is not maintained for production use, and installing large or critical packages may break the system.
+
+**Note:** In order to use the package manager, the system time must be set correctly to verify TLS certificates.
+
+### Package Repository
+
+Packages can be browsed and installed from the following repository:  
+[SolidRun Hailo IPK Package Feed](https://solidrun-packages.com/hailo/meta-solidrun-arm-hailo/ipk/)
+
+
+
 ## More Information
 For the information on how to flash and boot the board 
 please follow the [Quick Start Guide](https://solidrun.atlassian.net/wiki/spaces/developer/pages/722042882/HummingBoard+Hailo+15+SOM+Quick+Start+Guide)  

@@ -1,0 +1,130 @@
+name: build-packages
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  
+  # Weekly on Wednesdays
+  # schedule:
+  #   - cron: "0 0 * * 5"
+
+jobs:
+  prepare_container:
+    runs-on: self-hosted
+    outputs: 
+      uid: ${{ steps.uid_step.outputs.userid }}
+      gid: ${{ steps.uid_step.outputs.groupid }}
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+
+      - name: Get user id/group
+        id: uid_step
+        run: |
+          echo "userid=$(id -u)" >> "$GITHUB_OUTPUT"
+          echo "groupid=$(id -g)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config: /etc/docker/cibuilder.toml
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ciserver.ci:5000
+          username: ${{ secrets.CI_CACHE_REGISTRY_LOGIN }}
+          password: ${{ secrets.CI_CACHE_REGISTRY_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ciserver.ci:5000/${{ github.repository_id }}:latest
+          cache-from: type=registry,ref=ciserver.ci:5000/${{ github.repository_id }}:cache
+          cache-to: type=registry,ref=ciserver.ci:5000/${{ github.repository_id }}:cache,mode=max
+          file: conf/docker/Dockerfile
+          build-args: |
+            USER_ID=${{ steps.uid_step.outputs.userid }} 
+            GROUP_ID=${{ steps.uid_step.outputs.groupid }}
+
+  build_packages:
+    needs: prepare_container
+    runs-on: self-hosted
+    container: 
+        image: ciserver.ci:5000/${{ github.repository_id }}:latest
+        credentials:
+            username: ${{ secrets.CI_CACHE_REGISTRY_LOGIN }}
+            password: ${{ secrets.CI_CACHE_REGISTRY_PASSWORD }}
+        options: --user "${{ needs.prepare_container.outputs.uid }}:${{ needs.prepare_container.outputs.gid }}"
+    timeout-minutes: 1440  # 24 hours for world build
+    steps:
+      - name: Checkout repo 
+        uses: actions/checkout@v4
+        with:
+          path: meta-solidrun-arm-hailo
+      
+      - name: Checkout dependency layers
+        run: |
+          kas checkout meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
+
+      - name: Checkout assets
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.SSH_SECRET_KEY }}
+          repository: ${{ secrets.CERT_REPO }}
+          path: hailo-secureboot-assets
+
+      - name: Copy assets
+        run: cp -r hailo-secureboot-assets/* meta-solidrun-arm-hailo/recipes-bsp/
+
+      - name: Create cache dir
+        run: mkdir -p buildcache
+
+      - name: Fetch cache from server   
+        uses: tespkg/actions-cache/restore@v1
+        with:
+          endpoint: ciserver.ci
+          port: 9000
+          insecure: true
+          accessKey: ${{ secrets.CI_CACHE_MINIO_ACCESS }}
+          secretKey: ${{ secrets.CI_CACHE_MINIO_SECRET }}
+          bucket: cicache
+          use-fallback: false
+          key: ${{ github.repository }}
+          path: |
+            buildcache
+
+      - name: Build world packages
+        continue-on-error: true
+        shell: bash
+        run: |
+            WORKDIR=$(pwd)
+            source poky/oe-init-build-env
+            export CACHE_DIR="$WORKDIR/buildcache"
+            export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS CACHE_DIR"
+            
+            # Add package feed configuration
+            echo "require conf/includes/ci.conf" >> conf/local.conf
+            bitbake -k world || true
+            
+            # Generate package index
+            echo "Creating package index"
+            bitbake package-index
+
+      - name: Collect packages
+        shell: bash
+        run: |
+            mkdir -p packages
+            ln -s ../build/tmp/deploy/ipk/all packages/all
+            ln -s ../build/tmp/deploy/ipk/armv8a packages/armv8a
+            touch packages/Packages
+
+      - name: Upload packages
+        env:
+          AWS_ACCESS_KEY_ID: '${{ secrets.PACKAGES_S3_ACCESS }}'
+          AWS_SECRET_ACCESS_KEY: '${{ secrets.PACKAGES_S3_SECRET }}'
+        run: |
+          cd packages
+          s5cmd --endpoint-url 'https://${{ secrets.IMAGES_S3_HOST }}' sync --delete . s3://solidrun-package-repository/hailo/meta-solidrun-arm-hailo/ipk/
