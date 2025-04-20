@@ -24,6 +24,9 @@ RUN apt-get update && apt-get install -y apt-transport-https \
     tree sudo locales ca-certificates \
     bash icecc tmux
 
+RUN wget https://github.com/peak/s5cmd/releases/download/v2.3.0/s5cmd_2.3.0_linux_amd64.deb
+RUN dpkg -i s5cmd_2.3.0_linux_amd64.deb
+
 RUN locale-gen en_US.UTF-8
 
 RUN update-ca-certificates
