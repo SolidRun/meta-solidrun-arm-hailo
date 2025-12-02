@@ -78,7 +78,7 @@ jobs:
       - name: Set branch for kas
         if: github.event_name == 'pull_request'
         run: |
-          sed -i '/meta-solidrun-arm-hailo/{:a;n;s/branch: kirkstone/branch: ${{ github.head_ref }}/;Ta}' meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
+          sed -i '\|meta-solidrun-arm-hailo|{:a;n;s|branch: kirkstone|branch: ${{ github.head_ref }}|;Ta}' meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
           cat meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
       
       - name: Checkout dependency layers
