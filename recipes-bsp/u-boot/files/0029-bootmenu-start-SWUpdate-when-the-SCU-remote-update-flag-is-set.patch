@@ -1,0 +1,41 @@
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Mon, 15 Sep 2026 12:00:00 +0000
+Subject: [PATCH] bootmenu: start SWUpdate when the SCU remote-update flag is set
+
+Hailo's run_swupdate.sh (single mode) writes the SCU bootloader
+configuration with boot_image_mode = 1 ("remote update") and reboots.
+U-Boot's board code exports that field as ${boot_image_mode}; Hailo's
+own boot menus (since v1.9.0) test it and run boot_swupdate_mmc, which
+loads the SWUpdate ramdisk from the eMMC boot partition.
+
+The SolidRun board header replaces Hailo's environment and its default
+menu entry booted straight from eMMC, so the flag was ignored and the
+Linux-initiated update never started (the board simply rebooted into
+the old system with the flag left set in qSPI).
+
+Add the same test in front of the default "Boot from eMMC" entry. The
+SWUpdate ramdisk clears the flag when the update finishes, so the
+following boots are normal again. The U-Boot menu entry "SWUpdate"
+keeps working unchanged.
+
+Signed-off-by: guillermo <guillermo.karsz@solid-run.com>
+---
+ include/configs/hailo15-solidrun.h | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -19,7 +19,11 @@
+ 
+ #define BOOTMENU \
+     /* Try all boot options by order */ \
+-    "bootmenu_0=Boot from eMMC=run boot_mmc1\0" \
++    /* boot_image_mode = 1 means Linux requested a remote update */ \
++    /* (/etc/run_swupdate.sh): start SWUpdate like Hailo's boards do */ \
++    "bootmenu_0=Boot from eMMC=" \
++        "if test ${boot_image_mode} = 1; then run boot_swupdate_mmc; exit 1; fi; " \
++        "run boot_mmc1\0" \
+     "bootmenu_1=Boot to flashing ramdisk=run boot_flashing_ramdisk\0" \
+     "bootmenu_2=SWUpdate=run boot_swupdate_mmc\0" \
+     "default_spl_boot_source=mmc2\0" \
