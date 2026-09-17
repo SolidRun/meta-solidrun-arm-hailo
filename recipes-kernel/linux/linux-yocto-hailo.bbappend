@@ -14,7 +14,11 @@ SRC_URI:append = " \
     file://0010-renamed-sensor_0-label-and-deleted-imx334.patch \
     file://0012-hummingboard-iiot-hog-m2b-modem-power.patch \
     file://0013-imx678-do-not-hold-the-i2c-segment-lock-while-toggli.patch \
+    file://0014-hummingboard-iiot-boot-LED-defaults.patch \
+    file://0015-leds-lp55xx-set-the-chip-pointer-before-registering-the-LED.patch \
     file://0016-spi-advertise-the-QSPI-transfer-size-limit-through-spi-mux.patch \
+    file://0017-leds-lp55xx-register-LEDs-with-their-device-tree-node.patch \
+    file://0018-hummingboard-iiot-let-the-boot-LED-pattern-settle-on-the-final-colour.patch \
 "
 
 # defconfig

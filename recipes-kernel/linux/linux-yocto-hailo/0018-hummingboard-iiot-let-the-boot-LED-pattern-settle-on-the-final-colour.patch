@@ -1,0 +1,47 @@
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Thu, 17 Sep 2026 09:00:00 +0000
+Subject: [PATCH] hummingboard-iiot: let the boot LED pattern settle on the final colour
+
+The pattern trigger repeats a device-tree pattern forever. It holds a
+brightness only when two consecutive tuples carry the same value; when
+the last tuple wraps to the first with a different value it enters the
+gradual-dimming branch and re-arms a 50 ms timer for the whole hold
+time. The red channel ends and starts at 255, so it holds; the green
+and blue channels end at 160 / 90 and start at 0, so the trigger kept a
+timer and an I2C write to the LP5562 running every 50 ms on both
+channels for the whole uptime (the light looked right, nothing else
+did).
+
+Append a zero-length tuple with the hold value to those two patterns.
+The hold tuple then wraps to an equal brightness, takes the step branch
+and the timer is armed once for the hold time; the trigger skips the
+zero-length tuple when the pattern eventually repeats. The visible
+sequence is unchanged: red, green, blue, red over four seconds, then
+steady white.
+
+Signed-off-by: guillermo <guillermo.karsz@solid-run.com>
+---
+ arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+--- a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
++++ b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+@@ -140,7 +140,7 @@
+             chan-name = "G";
+             label = "G";
+             linux,default-trigger = "pattern";
+-            led-pattern = <0 1000 255 1000 0 1000 0 1000 160 4294967295>;
++            led-pattern = <0 1000 255 1000 0 1000 0 1000 160 4294967295 160 0>;
+             led-cur = /bits/ 8 <0x20>;
+             max-cur = /bits/ 8 <0x60>;
+             reg = <1>;
+@@ -151,7 +151,7 @@
+             chan-name = "B";
+             label = "B";
+             linux,default-trigger = "pattern";
+-            led-pattern = <0 1000 0 1000 255 1000 0 1000 90 4294967295>;
++            led-pattern = <0 1000 0 1000 255 1000 0 1000 90 4294967295 90 0>;
+             led-cur = /bits/ 8 <0x20>;
+             max-cur = /bits/ 8 <0x60>;
+             reg = <2>;

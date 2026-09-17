@@ -1,0 +1,36 @@
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Tue, 15 Sep 2026 12:30:00 +0000
+Subject: [PATCH] leds: lp55xx: set the chip pointer before registering the LED class device
+
+lp55xx_register_leds() registers each LED (lp55xx_init_led ->
+devm_led_classdev_register) and assigns led->chip only afterwards. With a
+default trigger in the device tree (linux,default-trigger = "default-on") the
+LED core sets the brightness during registration, lp55xx_set_brightness()
+reads led->chip->cfg from a NULL pointer and the kernel oopses at boot
+(seen on the HummingBoard IIoT, LP5562, kernel 5.15.32). Assign the pointer
+first.
+
+Signed-off-by: guillermo <guillermo.karsz@solid-run.com>
+---
+--- a/drivers/leds/leds-lp55xx-common.c
++++ b/drivers/leds/leds-lp55xx-common.c
+@@ -513,12 +513,18 @@
+ 
+ 		led_current = pdata->led_config[i].led_current;
+ 		each = led + i;
++		/*
++		 * The chip pointer must be valid before the LED class device is
++		 * registered: a default trigger ("linux,default-trigger") sets the
++		 * brightness during registration, and lp55xx_set_brightness()
++		 * dereferences led->chip.
++		 */
++		each->chip = chip;
+ 		ret = lp55xx_init_led(each, chip, i);
+ 		if (ret)
+ 			goto err_init_led;
+ 
+ 		chip->num_leds++;
+-		each->chip = chip;
+ 
+ 		/* setting led current at each channel */
+ 		if (cfg->set_led_current)
