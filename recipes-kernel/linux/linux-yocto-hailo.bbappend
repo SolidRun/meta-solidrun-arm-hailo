@@ -13,6 +13,7 @@ SRC_URI:append = " \
     file://0009-drop-vc8000e_reserved-now-CMA-based.patch \
     file://0010-renamed-sensor_0-label-and-deleted-imx334.patch \
     file://0013-imx678-do-not-hold-the-i2c-segment-lock-while-toggli.patch \
+    file://0016-spi-advertise-the-QSPI-transfer-size-limit-through-spi-mux.patch \
 "
 
 # defconfig
