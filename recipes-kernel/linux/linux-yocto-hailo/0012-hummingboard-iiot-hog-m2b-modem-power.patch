@@ -1,0 +1,37 @@
+From 7353bed1e562765822f3a9a0b62d45370bdd1a03 Mon Sep 17 00:00:00 2001
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Tue, 19 May 2026 09:49:15 +0000
+Subject: [PATCH] auto power M.2 B-slot at boot for modem
+
+---
+ arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+index 2f0b874e34a9..3fee336d2ab0 100644
+--- a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
++++ b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+@@ -63,6 +63,20 @@ TCA_VIDEO_PWR_EN {
+             output-high;
+             line-name = "TCA_VIDEO_PWR_EN";
+         };
++
++        TCA_M_2B_3V3_EN {
++            gpio-hog;
++            gpios = <5 GPIO_ACTIVE_HIGH>;
++            output-high;
++            line-name = "TCA_M.2B_3V3_EN";
++        };
++
++        TCA_M_2B_RESET {
++            gpio-hog;
++            gpios = <8 GPIO_ACTIVE_HIGH>;
++            output-high;
++            line-name = "TCA_M.2B_RESET#";
++        };
+     };
+ 
+     tca6416_21: gpio@21 {
+-- 
+2.53.0
+
