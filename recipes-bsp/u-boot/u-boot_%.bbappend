@@ -27,5 +27,6 @@ SRC_URI:append = " \
     file://0024-Remove-gpio8-from-u-boot-pinctr-conflict-with-rev-1.patch \
     file://0025-Update-DDR-binding.patch \
     file://0026-enlarge-SPL-stack.patch \
+    file://0028-ddr-add-SolidRun-SOM-DDR-configuration-node.patch \
     file://0030-hailo15-solidrun-restore-the-mmc2_boot-SPL-source-and-tidy-the-SWUpdate-env.patch \
 "
