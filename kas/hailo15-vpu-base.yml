@@ -1,0 +1,23 @@
+header:
+  version: 11
+
+local_conf_header:
+  DSP: |
+    DSP_COMPILATION_MODE = "release"
+    DSP_FULL_IMAGING = "false"
+  gstreamer: |
+    ADD_GSTREAMER_TO_IMAGE = "true"
+  flags: |
+    LICENSE_FLAGS_ACCEPTED:append = " commercial"
+  buildhistory: |
+    INHERIT += "buildhistory"
+    BUILDHISTORY_COMMIT = "1"
+
+repos:
+  meta-hailo:
+    url: "https://github.com/hailo-ai/meta-hailo.git"
+    refspec: kirkstone_v5.3.0
+    layers:
+      meta-hailo-libhailort:
+      meta-hailo-vpu:
+      meta-hailo-tappas:

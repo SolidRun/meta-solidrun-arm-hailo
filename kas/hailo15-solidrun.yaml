@@ -3,9 +3,11 @@ header:
   includes:
     - meta-hailo-soc.yaml
     - yocto-base.yaml
+    - hailo15-vpu-base.yml
 
 target:
-  - core-image-minimal
+  - core-image-hailo-dev
+  - hailo-update-image
 
 machine: hailo15-solidrun
 distro: poky
@@ -15,8 +17,8 @@ local_conf_header:
   meta-solidrun-arm-hailo: |
     require conf/includes/sr_image.conf
     require conf/includes/hailo_demo.conf
-    DISTRO_FEATURES:append = " hailo-core"
     DISTRO_FEATURES:append = " hailo-dev-pkg"
+    HAILO_TARGET = "core-image-hailo-dev"
 
 repos:
   meta-solidrun-arm-hailo:

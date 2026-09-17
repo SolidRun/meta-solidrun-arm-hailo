@@ -162,21 +162,21 @@ index d351d22b7a..e18e842a57 100644
  source "board/hailo/hailo15-ginger-soc/Kconfig"
  source "board/hailo/hailo15-ginger-soc-sdio0/Kconfig"
 diff --git a/board/hailo/common/hailo15_spl.c b/board/hailo/common/hailo15_spl.c
-index d7b69df090..619cf335fb 100644
+index 331e7c62bd..61dae0d523 100644
 --- a/board/hailo/common/hailo15_spl.c
 +++ b/board/hailo/common/hailo15_spl.c
-@@ -81,6 +81,11 @@ void board_boot_order(u32 *spl_boot_list)
+@@ -136,6 +136,11 @@ void board_boot_order(u32 *spl_boot_list)
  #endif /* CONFIG_TARGET_HAILO15L_OREGANO */
- 	} else if (!strcmp(s, "mmc2")) {
- 		spl_boot_list[0] = BOOT_DEVICE_MMC2;
+     } else if (!strcmp(s, "mmc2")) {
+         spl_boot_list[0] = BOOT_DEVICE_MMC2;
 +#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
-+		/* Fallback to the uart if eMMC is empty */
-+		spl_boot_list[1] = BOOT_DEVICE_UART;
++               /* Fallback to the uart if eMMC is empty */
++               spl_boot_list[1] = BOOT_DEVICE_UART;
 +#endif
 +
- 	} else if (!strcmp(s, "mmc12")) {
- 		spl_boot_list[0] = BOOT_DEVICE_MMC1;
- 		spl_boot_list[1] = BOOT_DEVICE_MMC2;
+     } else if (!strcmp(s, "mmc12")) {
+         spl_boot_list[0] = BOOT_DEVICE_MMC1;
+         spl_boot_list[1] = BOOT_DEVICE_MMC2;
 diff --git a/board/hailo/hailo15-solidrun/Kconfig b/board/hailo/hailo15-solidrun/Kconfig
 new file mode 100644
 index 0000000000..c886e471b6

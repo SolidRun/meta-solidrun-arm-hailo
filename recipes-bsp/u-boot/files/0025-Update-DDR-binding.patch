@@ -1,0 +1,25 @@
+From 2960948647730bc6d341e46a5f45988216f4497f Mon Sep 17 00:00:00 2001
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Mon, 11 May 2026 14:48:16 +0300
+Subject: [PATCH] Update DDR binding
+
+---
+ arch/arm/dts/hailo15-solidrun.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/dts/hailo15-solidrun.dts b/arch/arm/dts/hailo15-solidrun.dts
+index 022ca7f67d..343690484c 100644
+--- a/arch/arm/dts/hailo15-solidrun.dts
++++ b/arch/arm/dts/hailo15-solidrun.dts
+@@ -6,7 +6,7 @@
+ 
+ #include "hailo15-base.dtsi"
+ #include "hailo15_ddr_configuration.dtsi"
+-#include "hailo15_ddr_MT53E1G32D2FW-046_regconfig_ca_odtb_pd_4GB.dtsi"
++#include "hailo1x_ddr_MT53E1G32D2FW-046-B_regconfig_ca_odtb_pd_4GB_LP4.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+-- 
+2.43.0
+

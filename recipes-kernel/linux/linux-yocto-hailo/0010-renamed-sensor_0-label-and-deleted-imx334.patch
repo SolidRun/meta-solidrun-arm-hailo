@@ -1,0 +1,111 @@
+From 4fc4ef166ff9014e8c0ea4e1ba3bfed37355d823 Mon Sep 17 00:00:00 2001
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Sun, 17 May 2026 08:19:40 +0000
+Subject: [PATCH] renamed sensor_0 label, deleted imx334, restored csi2rx0
+ endpoint
+
+---
+ .../dts/hailo/hailo15-sr-som-v1-overlay.dts   | 28 +++++++++----------
+ .../boot/dts/hailo/hummingboard-iiot.dtsi     | 14 ++++++----
+ 2 files changed, 22 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts b/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
+index 7dce65befbf2..315d510eae32 100644
+--- a/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
++++ b/arch/arm64/boot/dts/hailo/hailo15-sr-som-v1-overlay.dts
+@@ -28,7 +28,7 @@ sensor_i2c0: camera-sensor-i2c0@1a {
+                 port {
+                     sensor_out_csi2rx_i2c0: endpoint {
+                         data-lanes = <1 2 3 4>;
+-                        remote-endpoint = <&csi2rx_in_sensor>;
++                        remote-endpoint = <&csi2rx0_in_sensor>;
+                         link-frequencies = /bits/ 64 <891000000 1440000000 1782000000>;
+                     };
+                 };
+@@ -37,22 +37,22 @@ sensor_out_csi2rx_i2c0: endpoint {
+     };
+ 
+     /* 3. Update the remote-endpoint in csi2rx0 to point to sensor_out_csi2rx_i2c0 */
+-    fragment@2 {
+-        target = <&csi2rx0>;
+-        __overlay__ {
+-            ports {
+-                port@0 {
+-                    csi2rx_in_sensor: endpoint {
+-                        remote-endpoint = <&sensor_out_csi2rx_i2c0>;
+-                    };
+-                };
+-            };
+-        };
+-    };
++    // fragment@2 {
++    //     target = <&csi2rx0>;
++    //     __overlay__ {
++    //         ports {
++    //             port@0 {
++    //                 csi2rx0_in_sensor: endpoint {
++    //                     remote-endpoint = <&sensor_out_csi2rx_i2c0>;
++    //                 };
++    //             };
++    //         };
++    //     };
++    // };
+ 
+     /* 4. Disable the sensor_0 node */
+     fragment@3 {
+-        target = <&sensor_0>;
++        target = <&sensor_sr_0>;
+         __overlay__ {
+             status = "disabled";
+         };
+diff --git a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+index 84314da95c2c..2f0b874e34a9 100644
+--- a/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
++++ b/arch/arm64/boot/dts/hailo/hummingboard-iiot.dtsi
+@@ -29,6 +29,8 @@ mipi_backlight: backlight {
+     };
+ };
+ 
++/delete-node/ &sensor_0;
++
+ &i2c_2 {
+     status = "okay";
+ 
+@@ -196,9 +198,9 @@ i2c_csi: i2c@1 {
+             #size-cells = <0>;
+             reg = <1>;
+ 
+-            sensor_0: camera-sensor@1a {
++            sensor_sr_0: camera-sensor@1a {
+                 status = "okay";
+-                compatible = "sony,imx334", "sony,imx678";
++                compatible = "sony,imx678";
+                 reg = <0x1a>;
+                 clocks = <&sensor_clk>;
+                 clock-names = "inclk";
+@@ -206,9 +208,9 @@ sensor_0: camera-sensor@1a {
+                 csi-id = <0>;
+                 reset-gpios = <&gpio_dsi_expander 0 GPIO_ACTIVE_HIGH>;
+                 port {
+-                    sensor_out_csi2rx: endpoint {
++                    sensor_out_sr_csi2rx0: endpoint {
+                         data-lanes = <1 2 3 4>;
+-                        remote-endpoint = <&csi2rx_in_sensor>;
++                        remote-endpoint = <&csi2rx0_in_sensor>;
+                         link-frequencies = /bits/ 64 <891000000 1440000000 1782000000>;
+                     };
+                 };
+@@ -278,8 +280,8 @@ &csi2rx0 {
+     status = "okay";
+     ports {
+         port@0 {
+-            csi2rx_in_sensor: endpoint {
+-                remote-endpoint = <&sensor_out_csi2rx>;
++            csi2rx0_in_sensor: endpoint {
++                remote-endpoint = <&sensor_out_sr_csi2rx0>;
+             };
+         };
+     };
+-- 
+2.53.0
+

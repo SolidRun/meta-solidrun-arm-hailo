@@ -10,9 +10,15 @@ SRC_URI:append = " \
     file://0006-SOM-Rev-1.1.patch \
     file://0007-Enable-Hailo-SR-SoM-rev-1.1-and-1.0-co-support.patch \
     file://0008-Enable-uarts-2-and-3-with-USB.patch \
+    file://0009-drop-vc8000e_reserved-now-CMA-based.patch \
+    file://0010-renamed-sensor_0-label-and-deleted-imx334.patch \
 "
 
 # defconfig
 SRC_URI:append = " \
     file://solidrun-H15-SOM.cfg \
 "
+
+# Hailo's kernel bbappend used to add KERNEL_OVERLAYS to KERNEL_DEVICETREE (removed upstream in v1.9.0).
+# Our U-Boot boots fitImage configuration "conf-hailo_hailo15-sr-som-v1-overlay.dtbo" on SOM rev 1.0.
+KERNEL_DEVICETREE:append = " ${KERNEL_OVERLAYS}"

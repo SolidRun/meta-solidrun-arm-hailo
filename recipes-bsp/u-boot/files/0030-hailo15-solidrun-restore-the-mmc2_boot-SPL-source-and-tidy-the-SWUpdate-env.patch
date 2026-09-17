@@ -1,0 +1,53 @@
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Thu, 17 Sep 2026 09:00:00 +0000
+Subject: [PATCH] hailo15-solidrun: restore the mmc2_boot SPL source and tidy the SWUpdate env
+
+Two small corrections found in review, no behaviour change on the
+HummingBoard IIoT:
+
+- board/hailo/common/hailo15_spl.c: the rebase of the SolidRun SPL
+  fallback patch onto v1.11 dropped Hailo's "mmc2_boot" boot-source
+  branch by accident, which left is_mmc2_boot dead and the eMMC-boot-
+  partition mode unreachable. Put the branch back exactly as Hailo has
+  it (only Hailo's hailo15l-sbc uses that boot source).
+
+- include/configs/hailo15-solidrun.h: "bootargs_nand_fitimage" is no
+  longer run by Hailo's boot_swupdate since v1.12.x, drop the dead
+  default; and let the SWUpdate ramdisk boot select the fitImage
+  configuration like the normal eMMC boot does (${fit_image_conf},
+  set by board_late_init on a SOM rev 1.0, empty otherwise).
+
+Signed-off-by: guillermo <guillermo.karsz@solid-run.com>
+---
+ board/hailo/common/hailo15_spl.c  | 3 +++
+ include/configs/hailo15-solidrun.h | 3 +--
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/board/hailo/common/hailo15_spl.c b/board/hailo/common/hailo15_spl.c
+--- a/board/hailo/common/hailo15_spl.c
++++ b/board/hailo/common/hailo15_spl.c
+@@ -192,6 +192,9 @@
+         spl_boot_list[0] = BOOT_DEVICE_RAM;
+     } else if (!strcmp(s, "nor")) {
+         spl_boot_list[0] = BOOT_DEVICE_NOR;
++    } else if (!strcmp(s, "mmc2_boot")) {
++        spl_boot_list[0] = BOOT_DEVICE_MMC2;
++        is_mmc2_boot = 1;
+     } else {
+ #ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
+         printf("spl_boot_source=%s unsupported, falling back to mmc2\n", s);
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -70,10 +70,9 @@
+     "default_bootdelay=2\0" \
+     /* SWUpdate prerequisites (used by boot_swupdate in v1.11+) */ \
+     "bootargs_rw=setenv bootargs ${bootargs} rw\0" \
+-    "bootargs_nand_fitimage=true\0" \
+     "fs_ram_addr=0x90000000\0" \
+     "initrd_arg=-\0" \
+-    "boot=bootm ${far_ram_addr} ${initrd_arg}\0" \
++    "boot=bootm ${far_ram_addr}${fit_image_conf} ${initrd_arg}\0" \
+     "_do_boot_ram=run bootargs_ram && setenv initrd_arg ${fs_ram_addr}:${boot_ram_size} && run boot\0" \
+     SWUPDATE_EXTRA_ENV_SETTINGS \
+     BOOTMENU \
