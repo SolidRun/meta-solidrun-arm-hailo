@@ -1,0 +1,93 @@
+From 93cc967e24601944c3cdd03c2f3f72a48c46dccf Mon Sep 17 00:00:00 2001
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Tue, 8 Sep 2026 13:14:28 +0000
+Subject: [PATCH] imx678: do not hold the i2c segment lock while toggling the
+ reset GPIO
+
+Hailo BSP 1.12.0 wrapped imx678_power_on()/imx678_power_off() in
+i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT) so that userspace 3A
+i2c traffic cannot reach a sensor that is mid-reset.
+
+On the SolidRun HummingBoard IIoT the sensor reset line (CAM_RST#) is a
+pin of a TCA6408 GPIO expander that sits on a sibling channel of the
+same PCA9546 mux as the sensor. The mux is parent-locked, so the segment
+lock is the parent bus lock, and writing the expander from under it
+deadlocks on our own lock. rt_mutex_handle_deadlock() then parks the
+task forever with the parent bus locked: camera, touchscreen and the
+DSI panel GPIOs (same expander) are dead, and when the panel is bound at
+boot the framebuffer console hangs holding console_lock.
+
+Release reset before taking the lock and keep the lock only around the
+clock enable and the sensor boot window. Drop the lock in power_off:
+once reset is asserted a stray register write is harmless.
+---
+ drivers/media/i2c/imx678.c | 28 ++++++++++++++++------------
+ 1 file changed, 16 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/media/i2c/imx678.c b/drivers/media/i2c/imx678.c
+index 1426dce239bc..9738d05bc9ce 100644
+--- a/drivers/media/i2c/imx678.c
++++ b/drivers/media/i2c/imx678.c
+@@ -4705,15 +4705,21 @@ static int imx678_power_on(struct device *dev)
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	int ret;
+ 
+-	/* Hold i2c bus across the power-on transition so userspace 3A i2c
+-	 * cannot interleave a write to a sensor that is mid-reset. */
+-	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+-
++	/*
++	 * Release reset before taking the i2c segment lock. On boards where the
++	 * reset GPIO lives on an I2C GPIO expander behind the same mux as the
++	 * sensor (e.g. SolidRun HummingBoard IIoT), toggling it needs the parent
++	 * bus and would deadlock against our own lock.
++	 */
+ 	gpiod_set_value_cansleep(imx678->reset_gpio, 1);
+ 
+ 	/* XCLR high to INCK start must be >= 1us */
+ 	udelay(2);
+ 
++	/* Hold i2c bus across the sensor boot window so userspace 3A i2c
++	 * cannot interleave a write to a sensor that is mid-reset. */
++	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
++
+ 	ret = clk_prepare_enable(imx678->inclk);
+ 	if (ret) {
+ 		dev_err(imx678->dev, "fail to enable inclk");
+@@ -4726,8 +4732,8 @@ static int imx678_power_on(struct device *dev)
+ 	return 0;
+ 
+ error_reset:
+-	gpiod_set_value_cansleep(imx678->reset_gpio, 0);
+ 	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
++	gpiod_set_value_cansleep(imx678->reset_gpio, 0);
+ 
+ 	return ret;
+ }
+@@ -4742,18 +4748,16 @@ static int imx678_power_off(struct device *dev)
+ {
+ 	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+ 	struct imx678 *imx678 = to_imx678(sd);
+-	struct i2c_client *client = v4l2_get_subdevdata(sd);
+-
+-	/* Hold i2c bus across the power-off transition so userspace 3A i2c
+-	 * cannot interleave a write to a sensor that is mid-reset. */
+-	i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+ 
++	/*
++	 * No i2c segment lock here: the reset GPIO may sit behind the same I2C
++	 * mux as the sensor (see imx678_power_on()), and once reset is asserted
++	 * a stray register write is harmless anyway.
++	 */
+ 	gpiod_set_value_cansleep(imx678->reset_gpio, 0);
+ 
+ 	clk_disable_unprepare(imx678->inclk);
+ 
+-	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
+-
+ 	return 0;
+ }
+ 
+-- 
+2.55.0
+
