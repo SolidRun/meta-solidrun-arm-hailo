@@ -169,6 +169,76 @@ SWUpdate keeps the network configuration of the previous installation: `/etc/net
 
 If the download fails (server not reachable), the board stays in update mode and retries at every boot. To leave update mode without updating: select `U-Boot console` in the menu, run `run boot_mmc1`, and once Linux is up run `/etc/set_sw_image.sh a`. Programming the qSPI with the board tools also clears it.
 
+## Using the SOM on a custom carrier
+
+The Hailo-15 SOM can be used on a carrier board of your own with its own device tree. U-Boot normally selects the kernel device tree (a fitImage configuration) by reading the SOM revision from the SOM EEPROM, which is what the HummingBoard carriers need. On a custom carrier you switch that logic off and give U-Boot the name of the configuration to boot. Nothing in this layer has to be edited: your device tree, one U-Boot configuration fragment and one variable live in your own layer. The MAC address is still read from the SOM EEPROM.
+
+### 1. Add your device tree to the kernel
+
+In your layer, `recipes-kernel/linux/linux-yocto-hailo.bbappend` adds your DTS with a kernel patch (the patch creates `arch/arm64/boot/dts/hailo/<your-board>.dts` and adds a `dtb-$(CONFIG_ARCH_HAILO15) += <your-board>.dtb` line to the `Makefile` in that directory) and lists it in `KERNEL_DEVICETREE`:
+
+```
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+SRC_URI:append = " file://0001-hailo15-add-the-<your-board>-device-tree.patch"
+KERNEL_DEVICETREE:append = " hailo/<your-board>.dtb"
+```
+
+Your DTS includes `hailo15-sr-som.dtsi` (the SOM) and describes your carrier; `hailo15-solidrun.dts` (the HummingBoard IIoT) is the reference. The fitImage then contains a configuration named `conf-hailo_<your-board>.dtb` (Yocto builds the name from `conf-` and the DTB path with `/` replaced by `_`). `dumpimage -l fitImage` on the PC lists the configurations.
+
+### 2. Tell U-Boot which configuration to boot
+
+Switch the EEPROM-based selection off, in `conf/local.conf` (or in your machine configuration or kas file):
+
+```
+SOLIDRUN_EEPROM_DTS = "0"
+```
+
+and add a U-Boot configuration fragment in your layer, `recipes-bsp/u-boot/u-boot_%.bbappend`:
+
+```
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+SRC_URI:append = " file://custom-carrier.cfg"
+```
+
+with `recipes-bsp/u-boot/files/custom-carrier.cfg`:
+
+```
+CONFIG_SOLIDRUN_FIT_CONF="conf-hailo_<your-board>.dtb"
+```
+
+Rebuild the image. At boot U-Boot prints `Selecting static fit config #conf-hailo_<your-board>.dtb` and the kernel reports your model string.
+
+### Example
+
+The files below were used to test this mechanism on a HummingBoard IIoT. The example device tree is the HummingBoard IIoT tree with another model string, so the boot log shows which tree U-Boot selected. The kernel patch adds `arch/arm64/boot/dts/hailo/hailo15-customer-example.dts`:
+
+```
+/dts-v1/;
+
+#include "hailo15-solidrun.dts"
+
+/ {
+    model = "SolidRun HummingBoard IIoT (customer example DT)";
+};
+```
+
+and the Makefile line `dtb-$(CONFIG_ARCH_HAILO15) += hailo15-customer-example.dtb`. With `KERNEL_DEVICETREE:append = " hailo/hailo15-customer-example.dtb"` in the kernel bbappend, `SOLIDRUN_EEPROM_DTS = "0"` in `local.conf` and `CONFIG_SOLIDRUN_FIT_CONF="conf-hailo_hailo15-customer-example.dtb"` in the U-Boot fragment, the boot log shows:
+
+```
+Selecting static fit config #conf-hailo_hailo15-customer-example.dtb
+...
+   Using 'conf-hailo_hailo15-customer-example.dtb' configuration
+...
+[    0.000000] Machine model: SolidRun HummingBoard IIoT (customer example DT)
+```
+
+### How it works
+
+- `CONFIG_SOLIDRUN_EEPROM_DTS` (U-Boot Kconfig, `board/hailo/hailo15-solidrun/Kconfig`) enables the EEPROM-based selection. It is off in U-Boot's own defconfig. This layer switches it on with `SOLIDRUN_EEPROM_DTS ??= "1"` in `conf/machine/hailo15-solidrun.conf`, which makes the U-Boot recipe add the fragment `solidrun_eeprom_dts.cfg`. Setting the variable to `"0"` leaves the option off. With it on, a SOM rev 1.0 boots `conf-hailo_hailo15-solidrun.dtb` with the `hailo15-sr-som-v1-overlay.dtbo` overlay, a rev 1.1 boots the fitImage default.
+- With the option off, U-Boot boots the configuration named by `CONFIG_SOLIDRUN_FIT_CONF`. An empty value means the fitImage default, which is the first DTB in `KERNEL_DEVICETREE`.
+- A `fit_image_conf` value already present in the U-Boot environment wins in both cases, so a configuration can also be tried from the U-Boot console without rebuilding: `setenv fit_image_conf '#conf-hailo_<your-board>.dtb'` and `run boot_mmc1`.
+- A wrong name stops the boot with `Could not find configuration node` instead of silently booting another device tree.
+
 ## Using the Package Manager
 
 The development image includes the `opkg` package manager. It is intended for installing lightweight tools and dependencies during development and evaluation.

@@ -31,4 +31,8 @@ SRC_URI:append = " \
     file://0028-ddr-add-SolidRun-SOM-DDR-configuration-node.patch \
     file://0029-bootmenu-start-SWUpdate-when-the-SCU-remote-update-flag-is-set.patch \
     file://0030-hailo15-solidrun-restore-the-mmc2_boot-SPL-source-and-tidy-the-SWUpdate-env.patch \
+    file://0031-hailo15-solidrun-make-the-EEPROM-based-fitImage-configuration-selection-optional.patch \
 "
+
+# EEPROM-based fitImage configuration selection (U-Boot patch 0031), on by default, see the machine conf.
+SRC_URI:append = "${@oe.utils.conditional('SOLIDRUN_EEPROM_DTS', '1', ' file://solidrun_eeprom_dts.cfg', '', d)}"
