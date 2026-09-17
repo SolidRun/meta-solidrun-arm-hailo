@@ -112,12 +112,10 @@ jobs:
           path: |
             buildcache
 
-      - name: Build board tools
-        shell: bash
-        run: |
-            python3 -m pip wheel meta-hailo-soc/meta-hailo-bsp/hailo15_board_tools
+      # The Hailo board tools are no longer part of the BSP layers (removed by Hailo in v1.8.0).
+      # They come from the Hailo Developer Zone and must match the BSP version (see README).
 
-      - name: Build
+      - name: Build development image
         shell: bash
         run: |
             iceccd --no-remote -s ciserver.ci -d
@@ -128,10 +126,28 @@ jobs:
             echo "require conf/includes/ci.conf" >> conf/local.conf
             cat conf/local.conf
             bitbake -c cleanall scu-bl scu-fw u-boot u-boot-tfa-image trusted-firmware-a-hailo
-            bitbake core-image-minimal --runall=fetch
-            bitbake core-image-minimal hailo-update-image
-            bitbake core-image-minimal -c populate_sdk
-    
+            bitbake core-image-hailo-dev hailo-update-image --runall=fetch
+            bitbake core-image-hailo-dev hailo-update-image
+            bitbake core-image-hailo-dev -c populate_sdk
+            # both kas configurations produce hailo-update-image-hailo15-solidrun.swu: keep this one under its own name
+            cp tmp/deploy/images/hailo15-solidrun/hailo-update-image-hailo15-solidrun.swu tmp/deploy/images/hailo15-solidrun/hailo-update-image-hailo15-solidrun-dev.swu
+
+      - name: Build production image
+        shell: bash
+        run: |
+            # kas checkout regenerates conf/local.conf, so the CI include is added again.
+            # U-Boot is rebuilt here (its configuration follows HAILO_TARGET), so the qSPI set
+            # published below comes from this production build; it differs from the development
+            # build only in the signature bytes and the unused environment variable core_image_name.
+            kas checkout meta-solidrun-arm-hailo/kas/hailo15-solidrun-production.yaml
+            WORKDIR=$(pwd)
+            source poky/oe-init-build-env
+            export CACHE_DIR="$WORKDIR/buildcache"
+            export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS CACHE_DIR"
+            echo "require conf/includes/ci.conf" >> conf/local.conf
+            bitbake core-image-hailo hailo-update-image
+            cp tmp/deploy/images/hailo15-solidrun/hailo-update-image-hailo15-solidrun.swu tmp/deploy/images/hailo15-solidrun/hailo-update-image-hailo15-solidrun-production.swu
+
       - name: Update cache on the server  
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         uses: tespkg/actions-cache/save@v1
@@ -153,8 +169,10 @@ jobs:
             mkdir deploy
             BUILD_PATH=build/tmp/deploy/images/hailo15-solidrun
             SDK_PATH=build/tmp/deploy/sdk
-            cp $BUILD_PATH/core-image-minimal-hailo15-solidrun.wic.zst deploy/
-            cp $BUILD_PATH/core-image-minimal-hailo15-solidrun.wic.bmap deploy/
+            cp $BUILD_PATH/core-image-hailo-dev-hailo15-solidrun.wic.zst deploy/
+            cp $BUILD_PATH/core-image-hailo-dev-hailo15-solidrun.wic.bmap deploy/
+            cp $BUILD_PATH/core-image-hailo-hailo15-solidrun.wic.zst deploy/
+            cp $BUILD_PATH/core-image-hailo-hailo15-solidrun.wic.bmap deploy/
             cp $BUILD_PATH/customer_certificate.bin deploy/
             cp $BUILD_PATH/fitImage deploy/
             cp $BUILD_PATH/fitImage-core-image-flashing-ramdisk-hailo15-solidrun-hailo15-solidrun deploy/
@@ -167,9 +185,9 @@ jobs:
             cp $BUILD_PATH/u-boot-spl.bin deploy/
             cp $BUILD_PATH/u-boot-tfa.itb deploy/
             cp $BUILD_PATH/hailo15_uart_recovery_fw.bin deploy/
-            cp $BUILD_PATH/hailo-update-image-hailo15-solidrun.swu deploy/
-            cp $SDK_PATH/poky-glibc-x86_64-core-image-minimal-armv8a-hailo15-solidrun-toolchain-*.sh deploy/
-            cp hailo15_board_tools*.whl deploy/
+            cp $BUILD_PATH/hailo-update-image-hailo15-solidrun-dev.swu deploy/
+            cp $BUILD_PATH/hailo-update-image-hailo15-solidrun-production.swu deploy/
+            cp $SDK_PATH/poky-glibc-x86_64-core-image-hailo-dev-armv8a-hailo15-solidrun-toolchain-*.sh deploy/
 
       - name: Deploy to the local minio storage
         uses: yakubique/minio-upload@v1.1.3
