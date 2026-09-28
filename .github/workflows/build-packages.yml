@@ -64,7 +64,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: meta-solidrun-arm-hailo
-      
+      - name: Set branch for kas
+        run: |
+          sed -i '\|meta-solidrun-arm-hailo|{:a;n;s|branch: kirkstone|branch: ${{ github.head_ref || github.ref_name }}|;Ta}' meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
+          cat meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
+
       - name: Checkout dependency layers
         run: |
           kas checkout meta-solidrun-arm-hailo/kas/hailo15-solidrun.yaml
@@ -116,6 +120,10 @@ jobs:
       - name: Collect packages
         shell: bash
         run: |
+            if [ ! -d build/tmp/deploy/ipk/armv8a ] || [ "$(ls build/tmp/deploy/ipk/armv8a | wc -l)" -lt 100 ]; then
+                echo "No packages were built; refusing to touch the package feed."
+                exit 1
+            fi
             mkdir -p packages
             ln -s ../build/tmp/deploy/ipk/all packages/all
             ln -s ../build/tmp/deploy/ipk/armv8a packages/armv8a
