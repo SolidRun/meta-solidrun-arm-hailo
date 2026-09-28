@@ -18,5 +18,14 @@ do_install:append() {
     rm -f ${D}${libdir}/hailo-post-processes/libocr_post.so
     rm -f ${D}${libdir}/hailo-post-processes/libyolo_post.so
     rm -f ${D}${libdir}/hailo-post-processes/libyolo_hailortpp_post.so
-}
 
+    # The gsthailometa header and .pc file are byte-identical copies of what
+    # libgsthailotools-dev ships (both recipes build from the same tappas tree).
+    # They are the only content of hailo-post-processes-dev, and opkg refuses to
+    # install both -dev packages into the SDK sysroot (populate_sdk fails with a
+    # file clash). Drop the copies; libgsthailotools-dev remains the provider.
+    rm -f ${D}${includedir}/gsthailometa/gst_hailo_meta.hpp
+    rmdir ${D}${includedir}/gsthailometa 2>/dev/null || true
+    rm -f ${D}${libdir}/pkgconfig/gsthailometa.pc
+    rmdir ${D}${libdir}/pkgconfig 2>/dev/null || true
+}
