@@ -118,7 +118,6 @@ jobs:
       - name: Build development image
         shell: bash
         run: |
-            iceccd --no-remote -s ciserver.ci -d
             WORKDIR=$(pwd)
             source poky/oe-init-build-env
             export CACHE_DIR="$WORKDIR/buildcache"

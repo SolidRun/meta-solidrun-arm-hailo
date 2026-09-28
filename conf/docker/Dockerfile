@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y apt-transport-https \
     python3-subunit mesa-common-dev patchelf \
     zstd liblz4-tool file locales libacl1 \
     tree sudo locales ca-certificates \
-    bash icecc tmux
+    bash tmux
 
 RUN wget https://github.com/peak/s5cmd/releases/download/v2.3.0/s5cmd_2.3.0_linux_amd64.deb
 RUN dpkg -i s5cmd_2.3.0_linux_amd64.deb
