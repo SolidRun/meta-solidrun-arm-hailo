@@ -1,0 +1,15 @@
+header:
+  version: 11
+  includes:
+    - hailo15-solidrun.yaml
+
+target:
+  - core-image-hailo
+  - hailo-update-image
+
+local_conf_header:
+  meta-solidrun-arm-hailo: |
+    require conf/includes/sr_image.conf
+    require conf/includes/hailo_demo.conf
+    DISTRO_FEATURES:append = " hailo-core"
+    HAILO_TARGET = "core-image-hailo"

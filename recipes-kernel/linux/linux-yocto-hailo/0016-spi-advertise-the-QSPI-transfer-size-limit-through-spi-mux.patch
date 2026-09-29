@@ -1,0 +1,88 @@
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Tue, 15 Sep 2026 13:00:00 +0000
+Subject: [PATCH] spi: advertise the Cadence QSPI transfer size limit, also through spi-mux
+
+On the SolidRun Hailo-15 SOM the qSPI flash sits behind an spi-mux on the
+Cadence QSPI controller. Hailo's cqspi_transfer_one_message() rejects messages
+longer than 4 KiB of data ("message is too long"), but neither the controller
+nor the mux advertise that limit, so spi-mem/spi-nor issue e.g. the 16 KiB
+U-Boot environment read in one operation and fail: fw_printenv/fw_setenv
+("Cannot read environment, using default") and SWUpdate's environment update
+are broken.
+
+Advertise the limit in the QSPI driver and pass the parent's limits through
+spi-mux; spi_mem_adjust_op_size() then splits the operations.
+
+Signed-off-by: guillermo <guillermo.karsz@solid-run.com>
+---
+--- a/drivers/spi/spi-cadence-quadspi.c
++++ b/drivers/spi/spi-cadence-quadspi.c
+@@ -1885,6 +1885,21 @@
+ 	return status;
+ }
+ 
++/*
++ * Limits enforced by cqspi_transfer_one_message() for devices that use the
++ * generic transfer path (e.g. behind an spi-mux). Advertising them lets
++ * spi-mem/spi-nor split large reads and writes instead of failing.
++ */
++static size_t cqspi_max_transfer_size(struct spi_device *spi)
++{
++	return CQSPI_MAX_DATA_LENGTH;
++}
++
++static size_t cqspi_max_message_size(struct spi_device *spi)
++{
++	return CQSPI_MAX_MESSAGE_LENGTH;
++}
++
+ static int cqspi_probe(struct platform_device *pdev)
+ {
+ 	const struct cqspi_driver_platdata *ddata;
+@@ -1907,6 +1922,8 @@
+ 	master->dev.of_node = pdev->dev.of_node;
+ 	master->prepare_message = cqspi_prepare_message;
+ 	master->transfer_one_message = cqspi_transfer_one_message;
++	master->max_transfer_size = cqspi_max_transfer_size;
++	master->max_message_size = cqspi_max_message_size;
+ 
+ 	cqspi = spi_master_get_devdata(master);
+ 	cqspi->remaining_message_rx_bytes = 0;
+--- a/drivers/spi/spi-mux.c
++++ b/drivers/spi/spi-mux.c
+@@ -83,6 +83,26 @@
+ 	return spi_setup(priv->spi);
+ }
+ 
++/*
++ * The parent controller may limit the transfer and message sizes (the Cadence
++ * QSPI controller on Hailo-15 accepts at most 4 KiB of data per message).
++ * Report the parent's limits for our child devices, so that spi-mem/spi-nor
++ * split large operations instead of failing with "message is too long".
++ */
++static size_t spi_mux_max_transfer_size(struct spi_device *spi)
++{
++	struct spi_mux_priv *priv = spi_controller_get_devdata(spi->controller);
++
++	return spi_max_transfer_size(priv->spi);
++}
++
++static size_t spi_mux_max_message_size(struct spi_device *spi)
++{
++	struct spi_mux_priv *priv = spi_controller_get_devdata(spi->controller);
++
++	return spi_max_message_size(priv->spi);
++}
++
+ static void spi_mux_complete_cb(void *context)
+ {
+ 	struct spi_mux_priv *priv = (struct spi_mux_priv *)context;
+@@ -158,6 +178,8 @@
+ 	ctlr->flags = spi->controller->flags;
+ 	ctlr->transfer_one_message = spi_mux_transfer_one_message;
+ 	ctlr->setup = spi_mux_setup;
++	ctlr->max_transfer_size = spi_mux_max_transfer_size;
++	ctlr->max_message_size = spi_mux_max_message_size;
+ 	ctlr->num_chipselect = mux_control_states(priv->mux);
+ 	ctlr->bus_num = -1;
+ 	ctlr->dev.of_node = spi->dev.of_node;

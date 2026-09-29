@@ -1,0 +1,30 @@
+From 88c877161900630c3784b9ed6fdc008dc2f4cebf Mon Sep 17 00:00:00 2001
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Mon, 18 May 2026 08:59:49 +0000
+Subject: [PATCH] add v1.11 SWUpdate env prerequisites
+
+---
+ include/configs/hailo15-solidrun.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/include/configs/hailo15-solidrun.h b/include/configs/hailo15-solidrun.h
+index 24950afc2d..8811029a50 100644
+--- a/include/configs/hailo15-solidrun.h
++++ b/include/configs/hailo15-solidrun.h
+@@ -64,6 +64,13 @@
+     "auto_uboot_update=run update_uboot_mmc0_mmc1; env set auto_uboot_update_enable no && env set spl_boot_source ${default_spl_boot_source} && env set bootdelay ${default_bootdelay} && saveenv\0" \
+     "auto_uboot_update_enable=no\0" \
+     "default_bootdelay=2\0" \
++    /* SWUpdate prerequisites (used by boot_swupdate in v1.11+) */ \
++    "bootargs_rw=setenv bootargs ${bootargs} rw\0" \
++    "bootargs_nand_fitimage=true\0" \
++    "fs_ram_addr=0x90000000\0" \
++    "initrd_arg=-\0" \
++    "boot=bootm ${far_ram_addr} ${initrd_arg}\0" \
++    "_do_boot_ram=run bootargs_ram && setenv initrd_arg ${fs_ram_addr}:${boot_ram_size} && run boot\0" \
+     SWUPDATE_EXTRA_ENV_SETTINGS \
+     BOOTMENU \
+     UPDATE_PARTITIONS_COMMAND
+-- 
+2.53.0
+

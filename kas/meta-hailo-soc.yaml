@@ -4,7 +4,7 @@ header:
 repos:
   meta-hailo-soc:
     url: https://github.com/hailo-ai/meta-hailo-soc/
-    commit: dfbb55461fe16cae58a27105d69026a9bd57181e
+    commit: 84dc3c47b8a9f21cca28c29b753a1018915a671b
     layers:
       meta-hailo-bsp-examples:
       meta-hailo-bsp:
@@ -12,11 +12,3 @@ repos:
       meta-hailo-imaging:
       meta-hailo-linux:
       meta-hailo-media-library:
-      meta-hailo-tappas:
-
-  meta-hailo:
-    url: "https://github.com/hailo-ai/meta-hailo.git"
-    commit: 676702aecba552c2f73b852810a6d7a9a70884d0
-    layers:
-      meta-hailo-libhailort:
-      meta-hailo-vpu:

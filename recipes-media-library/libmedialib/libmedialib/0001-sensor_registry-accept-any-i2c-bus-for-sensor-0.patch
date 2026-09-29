@@ -1,0 +1,27 @@
+From 473b0f42db62a9d3e47b5b9b02b88c552bb2db51 Mon Sep 17 00:00:00 2001
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Sun, 17 May 2026 11:44:11 +0000
+Subject: [PATCH] sensor_registry: accept any i2c bus for sensor 0
+
+---
+ .../media_library/src/isp/sensor_registry/sensor_registry.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/hailo-media-library/media_library/src/isp/sensor_registry/sensor_registry.cpp b/hailo-media-library/media_library/src/isp/sensor_registry/sensor_registry.cpp
+index 67cfc5d..0b4d648 100644
+--- a/hailo-media-library/media_library/src/isp/sensor_registry/sensor_registry.cpp
++++ b/hailo-media-library/media_library/src/isp/sensor_registry/sensor_registry.cpp
+@@ -56,8 +56,8 @@ std::optional<SensorRegistry::SensorDeviceInfo> SensorRegistry::get_sensor_devic
+                         int bus = std::stoi(matches[1].str());
+                         std::string address = matches[2].str();
+ 
+-                        // Bus 0 matches sensor 0, bus != 0 matches sensor 1
+-                        if ((sensor_index == 0 && bus == 0) || (sensor_index == 1 && bus != 0))
++                        // accept first found sensor as sensor 0 (i2c bus may be non-zero via mux)
++                        if (sensor_index == 0)
+                         {
+                             std::string subdevice_path = "/dev/" + entry.path().filename().string();
+                             return SensorDeviceInfo{sensor_type, bus, address, subdevice_path};
+-- 
+2.53.0
+

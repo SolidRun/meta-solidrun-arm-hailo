@@ -1,0 +1,61 @@
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Tue, 15 Sep 2026 14:00:00 +0000
+Subject: [PATCH] leds: lp55xx: register LEDs with their device-tree node when a label is given
+
+The LED class core reads per-LED properties such as "led-pattern" (pattern
+trigger) from the fwnode of the LED class device, but lp55xx registers its
+LEDs without one, so device-tree patterns never reach the pattern trigger.
+Keep the channel node in the LED configuration and, when the node carries a
+"label", register the LED with led_init_data pointing at that node. The label
+becomes the LED name (unchanged for nodes whose label equals chan-name);
+nodes without a label keep the old registration path.
+
+Signed-off-by: guillermo <guillermo.karsz@solid-run.com>
+---
+--- a/include/linux/platform_data/leds-lp55xx.h
++++ b/include/linux/platform_data/leds-lp55xx.h
+@@ -25,6 +25,7 @@
+ struct lp55xx_led_config {
+ 	const char *name;
+ 	const char *default_trigger;
++	struct device_node *np;	/* DT node of the channel, if any */
+ 	u8 chan_nr;
+ 	u8 led_current; /* mA x10, 0 if led is not connected */
+ 	u8 max_current;
+--- a/drivers/leds/leds-lp55xx-common.c
++++ b/drivers/leds/leds-lp55xx-common.c
+@@ -221,10 +221,24 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	if (pdata->led_config[chan].num_colors > 1)
++	if (pdata->led_config[chan].num_colors > 1) {
+ 		ret = devm_led_classdev_multicolor_register(dev, &led->mc_cdev);
+-	else
++	} else if (pdata->led_config[chan].np &&
++		   of_find_property(pdata->led_config[chan].np, "label", NULL)) {
++		/*
++		 * Register with the channel's DT node so that the LED core can
++		 * read the node's properties, in particular "led-pattern" for
++		 * the pattern trigger. The DT "label" becomes the LED name, so
++		 * this path is only taken when a label is given.
++		 */
++		struct led_init_data init_data = {
++			.fwnode = of_fwnode_handle(pdata->led_config[chan].np),
++		};
++
++		ret = devm_led_classdev_register_ext(dev, &led->cdev, &init_data);
++	} else {
+ 		ret = devm_led_classdev_register(dev, &led->cdev);
++	}
+ 
+ 	if (ret) {
+ 		dev_err(dev, "led register err: %d\n", ret);
+@@ -643,6 +657,7 @@
+ 
+ 	cfg[child_number].default_trigger =
+ 		of_get_property(np, "linux,default-trigger", NULL);
++	cfg[child_number].np = np;
+ 
+ 	ret = of_property_read_u32(np, "color", &led_color);
+ 	if (ret)

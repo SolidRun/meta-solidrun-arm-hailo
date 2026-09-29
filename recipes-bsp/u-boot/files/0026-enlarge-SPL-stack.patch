@@ -1,0 +1,41 @@
+From e92ae6978fe1905a40815d135226602d44bc795c Mon Sep 17 00:00:00 2001
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Thu, 14 May 2026 10:45:47 +0000
+Subject: [PATCH] enlarge SPL stack
+
+---
+ configs/hailo15_solidrun_defconfig | 3 ++-
+ include/configs/hailo1x_common.h   | 4 ++++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/configs/hailo15_solidrun_defconfig b/configs/hailo15_solidrun_defconfig
+index 18c2a0974f..4bf95d5229 100644
+--- a/configs/hailo15_solidrun_defconfig
++++ b/configs/hailo15_solidrun_defconfig
+@@ -36,4 +36,5 @@ CONFIG_SPL_CMSDK_GPIO=y
+ CONFIG_SPL_DM_GPIO=y
+ CONFIG_SPL_DM_GPIO_LOOKUP_LABEL=y
+ CONFIG_SPL_GPIO_HOG=y
+-CONFIG_SPL_USE_TINY_PRINTF=y
+\ No newline at end of file
++CONFIG_SPL_USE_TINY_PRINTF=y
++CONFIG_SPL_SYS_MALLOC_F_LEN=0x200000
+diff --git a/include/configs/hailo1x_common.h b/include/configs/hailo1x_common.h
+index daa5eb1733..f8330553d7 100644
+--- a/include/configs/hailo1x_common.h
++++ b/include/configs/hailo1x_common.h
+@@ -29,7 +29,11 @@
+ 
+ #define CONFIG_SPL_MAX_SIZE (0x0002c000)
+ #define CONFIG_SPL_BSS_START_ADDR (0x8010f000)
++#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
++#define CONFIG_SPL_STACK (0x82000000)
++#else
+ #define CONFIG_SPL_STACK (0x801D4000)
++#endif
+ #define CONFIG_SPL_BSS_MAX_SIZE (0x2000)
+ #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME "u-boot-tfa.itb"
+ // Dummy value
+-- 
+2.53.0
+

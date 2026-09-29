@@ -1,0 +1,118 @@
+From: guillermo <guillermo.karsz@solid-run.com>
+Date: Thu, 17 Sep 2026 12:00:00 +0000
+Subject: [PATCH] hailo15-solidrun: make the EEPROM-based fitImage configuration selection optional
+
+board_late_init() reads the SOM revision from the SOM EEPROM and selects
+the kernel fitImage configuration from it (the SOM rev 1.0 overlay).
+A customer who uses the SolidRun SOM on a custom carrier with its own
+device tree needs to boot a different fitImage configuration without
+editing the board code.
+
+Put that logic behind a new Kconfig option, CONFIG_SOLIDRUN_EEPROM_DTS,
+disabled by default (the defconfig is unchanged; SolidRun's Yocto layer
+enables it for the HummingBoard carriers with a .cfg fragment). With the
+option enabled the code is exactly as before. With the option disabled
+the EEPROM lookup is compiled out and the configuration named by the new
+string option CONFIG_SOLIDRUN_FIT_CONF is booted instead (empty = the
+fitImage default configuration). In both cases a predefined
+fit_image_conf environment variable is kept, as before.
+
+The MAC address is still read from the SOM EEPROM unconditionally
+(set_mac_addr, called from Hailo's common board code).
+
+Signed-off-by: guillermo <guillermo.karsz@solid-run.com>
+---
+ board/hailo/hailo15-solidrun/Kconfig            |   22 ++++++++++++++++++++++
+ board/hailo/hailo15-solidrun/hailo15_solidrun.c |   19 +++++++++++++++++--
+ 2 files changed, 39 insertions(+), 2 deletions(-)
+
+diff --git a/board/hailo/hailo15-solidrun/Kconfig b/board/hailo/hailo15-solidrun/Kconfig
+--- a/board/hailo/hailo15-solidrun/Kconfig
++++ b/board/hailo/hailo15-solidrun/Kconfig
+@@ -9,4 +9,26 @@
+ config SYS_CONFIG_NAME
+ 	default "hailo15-solidrun"
+ 
++config SOLIDRUN_EEPROM_DTS
++	bool "Select the kernel fitImage configuration from the SOM EEPROM"
++	default n
++	help
++	  Read the SolidRun SOM revision from the SOM EEPROM at boot and
++	  select the matching kernel fitImage configuration (SOM rev 1.0
++	  overlay). Enabled by SolidRun's Yocto layer for the HummingBoard
++	  carriers. Leave it disabled on a custom carrier with its own
++	  device tree and set SOLIDRUN_FIT_CONF instead.
++
++config SOLIDRUN_FIT_CONF
++	string "Static kernel fitImage configuration"
++	depends on !SOLIDRUN_EEPROM_DTS
++	default ""
++	help
++	  Name of the kernel fitImage configuration to boot, as listed in
++	  the fitImage, for example "conf-hailo_hailo15-mycarrier.dtb"
++	  (Yocto names them conf-<vendor>_<dts>.dtb). U-Boot passes it to
++	  bootm as "#<name>". Leave it empty to boot the fitImage's default
++	  configuration. A predefined fit_image_conf environment variable
++	  always wins.
++
+ endif
+diff --git a/board/hailo/hailo15-solidrun/hailo15_solidrun.c b/board/hailo/hailo15-solidrun/hailo15_solidrun.c
+--- a/board/hailo/hailo15-solidrun/hailo15_solidrun.c
++++ b/board/hailo/hailo15-solidrun/hailo15_solidrun.c
+@@ -11,6 +11,10 @@
+ /* '#' in the beginning of the configuration name is a part of bootm syntax */
+ #define FIT_CONF "#conf-hailo_hailo15-solidrun.dtb" // default
+ #define FIT_CONF_SOM_REV1 FIT_CONF"#conf-hailo_hailo15-sr-som-v1-overlay.dtbo"
++#ifndef CONFIG_SOLIDRUN_EEPROM_DTS
++/* custom carrier: static configuration from Kconfig, no EEPROM lookup */
++#define FIT_CONF_STATIC "#" CONFIG_SOLIDRUN_FIT_CONF
++#endif
+ 
+ enum carrier_boards
+ {
+@@ -115,6 +119,7 @@
+ 	return board;
+ }
+ 
++#ifdef CONFIG_SOLIDRUN_EEPROM_DTS
+ int get_som_rev(void)
+ {
+ 	int ret = 0;
+@@ -143,10 +148,10 @@
+ 	}
+ 	return rev;
+ }
++#endif /* CONFIG_SOLIDRUN_EEPROM_DTS */
+ 
+ void set_fit_image_configurations(void)
+ {
+-    int som_rev;
+     char *fit_conf = env_get(FIT_CONF_ENV);
+     if (fit_conf != NULL)
+     {
+@@ -154,7 +159,8 @@
+         return;
+     }
+ 
+-    som_rev = get_som_rev();
++#ifdef CONFIG_SOLIDRUN_EEPROM_DTS
++    int som_rev = get_som_rev();
+ 	switch (som_rev)
+ 	{
+ 	case 10:
+@@ -165,6 +171,15 @@
+ 		pr_info("Leaving default fit configuration for som rev 1.1 \n");
+ 		break;
+     }
++#else
++    if (CONFIG_SOLIDRUN_FIT_CONF[0] == '\0')
++    {
++        pr_info("Leaving default fit configuration \n");
++        return;
++    }
++    printf("Selecting static fit config %s \n", FIT_CONF_STATIC);
++    env_set(FIT_CONF_ENV, FIT_CONF_STATIC);
++#endif
+ }
+ 
+ 

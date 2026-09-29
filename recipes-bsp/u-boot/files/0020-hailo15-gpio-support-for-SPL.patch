@@ -29,13 +29,13 @@ index cb2f22cae0..53b0c539e1 100644
 @@ -2,5 +2,11 @@
  config PINCTRL_HAILO15
  	bool "HAILO15 pinctrl driver"
- 	depends on MACH_HAILO15_FAMILY && PINCTRL
+ 	depends on MACH_HAILO1X && PINCTRL
 +	help
 +	  Say yes here to provide support for HAILO15 driver.
 +
 +config SPL_PINCTRL_HAILO15
 +	bool "HAILO15 pinctrl driver"
-+	depends on MACH_HAILO15_FAMILY && SPL_PINCTRL
++	depends on MACH_HAILO1X && SPL_PINCTRL
  	help
  	  Say yes here to provide support for HAILO15 driver.
 \ No newline at end of file

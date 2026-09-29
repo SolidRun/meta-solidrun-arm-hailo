@@ -125,77 +125,80 @@ diff --git a/board/hailo/common/hailo15_spl.c b/board/hailo/common/hailo15_spl.c
 index e8caff973c..22561ed4a6 100644
 --- a/board/hailo/common/hailo15_spl.c
 +++ b/board/hailo/common/hailo15_spl.c
-@@ -10,6 +10,7 @@
- #include <init.h>
- #include <cpu_func.h>
+@@ -13,6 +13,7 @@
+ #include <dm.h>
+ #include "scmi_hailo.h"
  #include "hailo15_board.h"
 +#include <asm/gpio.h>
+ #include "scmi_hailo_protocol.h"
  #ifdef CONFIG_SPL_ENV_IS_IN_MMC
  #include "mmc.h"
- #endif
-@@ -18,6 +19,24 @@
+@@ -26,6 +27,24 @@ int is_mmc2_boot = 0;
  
  DECLARE_GLOBAL_DATA_PTR;
  
 +int spl_check_boot_gpio1(void)
 +{
-+	struct gpio_desc *gpio;
-+	int ret;
-+	ret = gpio_hog_lookup_name("boot_conf_hog", &gpio);
-+	if (ret) {
-+		printf("%s: gpio_hog_lookup_name returned %d\n", __func__, ret);
-+		return ret;
-+	}
++       struct gpio_desc *gpio;
++       int ret;
++       ret = gpio_hog_lookup_name("boot_conf_hog", &gpio);
++       if (ret) {
++               printf("%s: gpio_hog_lookup_name returned %d\n", __func__, ret);
++               return ret;
++       }
 +
-+	ret = dm_gpio_get_value(gpio);
-+	if (ret < 0)
-+	{
-+		printf("%s: Failed to get spl_boot_config_gpio: %d\n", __func__, ret);
-+	}
-+	return ret;
++       ret = dm_gpio_get_value(gpio);
++       if (ret < 0)
++       {
++               printf("%s: Failed to get spl_boot_config_gpio: %d\n", __func__, ret);
++       }
++       return ret;
 +}
 +
- void board_init_f(ulong dummy)
+ #ifdef CONFIG_MACH_HAILO10
+ 
+ u32 hailo10_sku_board_id;
+@@ -117,6 +136,11 @@ void board_boot_order(u32 *spl_boot_list)
  {
- 	/* we enable MMU + caching before doing anything else to improve performace */
-@@ -65,14 +84,31 @@ void board_boot_order(u32 *spl_boot_list)
- {
- 	const char *s;
+     const char *s;
  
 +#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
-+	int boot_gpio;
-+	boot_gpio = spl_check_boot_gpio1();
++       int boot_gpio;
++       boot_gpio = spl_check_boot_gpio1();
 +#endif
 +
- 	env_init();
- 	env_load();
+     // Init indication that uboot TFA is in mmc boot section
+     is_mmc2_boot = 0;
  
- 	s = env_get("spl_boot_source");
+@@ -124,10 +148,22 @@ void board_boot_order(u32 *spl_boot_list)
+     env_load();
+ 
+     s = env_get("spl_boot_source");
 +#ifdef CONFIG_TARGET_HAILO15_SOLIDRUN
-+	if (!s) {
-+		puts("failed to get 'spl_boot_source' from env, falling back to mmc2\n");
-+		s = "mmc2";
-+	}
-+	if (boot_gpio == 1)
-+	{
-+		puts("Boot source is forced to uart with DIP switch\n");
-+		s = "uart";
-+	} 
++       if (!s) {
++               puts("failed to get 'spl_boot_source' from env, falling back to mmc2\n");
++               s = "mmc2";
++       }
++       if (boot_gpio == 1)
++       {
++               puts("Boot source is forced to uart with DIP switch\n");
++           s = "uart";
++    }
 +#else
- 	if (!s) {
- 		puts("failed to get 'spl_boot_source' from env, falling back to mmc12\n");
- 		s = "mmc12";
- 	}
+     if (!s) {
+         puts("failed to get 'spl_boot_source' from env, falling back to mmc12\n");
+         s = "mmc12";
+     }
 +#endif
  
- 	if (!strcmp(s, "mmc1")) {
- 		spl_boot_list[0] = BOOT_DEVICE_MMC1;
-@@ -114,7 +150,6 @@ void board_boot_order(u32 *spl_boot_list)
- 		spl_boot_list[1] = BOOT_DEVICE_MMC2;
+     if (!strcmp(s, "mmc1")) {
+         spl_boot_list[0] = BOOT_DEVICE_MMC1;
+@@ -205,7 +205,6 @@ void board_boot_order(u32 *spl_boot_list)
+         spl_boot_list[1] = BOOT_DEVICE_MMC2;
  #endif
- 	}
+     }
 -
- 	printf("U-Boot SPL boot source %s\n", s);
+     printf("U-Boot SPL boot source %s\n", s);
  }
  
 diff --git a/configs/hailo15_solidrun_defconfig b/configs/hailo15_solidrun_defconfig

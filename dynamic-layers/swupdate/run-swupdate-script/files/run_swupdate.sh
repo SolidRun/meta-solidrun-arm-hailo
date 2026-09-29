@@ -39,6 +39,31 @@ function single_mode()
 {
     echo "$SINGLE_MODE_MSG"
 
+    # In single mode the update runs from the SWUpdate ramdisk on the next boot.
+    # U-Boot always downloads hailo-update-image-<board>.swu (see
+    # setup_swupdate_update_filename), so a different -r value cannot be honoured.
+    if [[ -n "${F_REMOTE_FILENAME}" ]]; then
+        board=$(fw_printenv -n board 2>/dev/null) || board="hailo15-solidrun"
+        expected_filename="hailo-update-image-${board}.swu"
+        if [[ "${F_REMOTE_FILENAME}" != "${expected_filename}" ]]; then
+            echo "error: in single mode U-Boot downloads ${expected_filename}; rename the file on the server or omit -r"
+            return 1
+        fi
+    fi
+
+    # The HTTP server IP is read by U-Boot from swupdate_server_ip, falling back
+    # to serverip when it is empty. Store it when given on the command line.
+    if [[ -n "${F_SERVER}" ]]; then
+        echo "Setting U-Boot environment: swupdate_server_ip=${F_SERVER}"
+        fw_setenv swupdate_server_ip "${F_SERVER}" || {
+            echo "error: failed to set swupdate_server_ip in the U-Boot environment (check /etc/fw_env.config)"
+            return 1
+        }
+    else
+        serverip_uboot=$(fw_printenv -n swupdate_server_ip 2>/dev/null || fw_printenv -n serverip 2>/dev/null || true)
+        echo "Server IP not provided, U-Boot will download from: ${serverip_uboot:-<serverip not set>}"
+    fi
+
     /etc/set_sw_image.sh remote_update
 
     echo "Rebooting is about to start..."
